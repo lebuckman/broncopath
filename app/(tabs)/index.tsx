@@ -22,7 +22,7 @@ export default function HomeScreen() {
   const [routePressed, setRoutePressed] = useState(false);
 
   return (
-    <SafeAreaView className="flex-1" style={{ backgroundColor: Colors.bg }}>
+    <SafeAreaView edges={['top']} className="flex-1" style={{ backgroundColor: Colors.bg }}>
       <ScrollView
         className="flex-1"
         contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 24, paddingBottom: 40 }}
