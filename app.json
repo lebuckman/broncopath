@@ -13,7 +13,8 @@
       "backgroundColor": "#0d1117"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.anonymous.broncopath"
     },
     "android": {
       "adaptiveIcon": {
