@@ -4,8 +4,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Colors } from '../../constants/colors';
 import { Fonts } from '../../constants/fonts';
-import { BUILDINGS } from '../../constants/mockData';
+import { BUILDINGS, type Building } from '../../constants/mockData';
 import BuildingCard from '../../components/building/BuildingCard';
+import BuildingDetailSheet from '../../components/building/BuildingDetailSheet';
 import SectionLabel from '../../components/ui/SectionLabel';
 import NowPill from '../../components/ui/NowPill';
 
@@ -20,6 +21,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const [roomPressed, setRoomPressed] = useState(false);
   const [routePressed, setRoutePressed] = useState(false);
+  const [selectedBuilding, setSelectedBuilding] = useState<Building | null>(null);
 
   return (
     <SafeAreaView edges={['top']} className="flex-1" style={{ backgroundColor: Colors.bg }}>
@@ -57,7 +59,7 @@ export default function HomeScreen() {
               level={b.level}
               roomCount={b.roomCount}
               freeCount={b.freeCount}
-              onPress={() => {}}
+              onPress={() => setSelectedBuilding(b)}
             />
           ))}
         </View>
@@ -116,6 +118,12 @@ export default function HomeScreen() {
           </Pressable>
         </View>
       </ScrollView>
+
+      <BuildingDetailSheet
+        building={selectedBuilding}
+        visible={selectedBuilding !== null}
+        onClose={() => setSelectedBuilding(null)}
+      />
     </SafeAreaView>
   );
 }
