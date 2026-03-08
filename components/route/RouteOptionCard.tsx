@@ -32,6 +32,8 @@ export default function RouteOptionCard({ route, selected, onPress }: Props) {
     ? Colors.cardHover
     : selected && isRecommended
     ? Colors.accentBg
+    : selected
+    ? Colors.cardHover
     : Colors.card;
   const cardBorder = selected
     ? isRecommended ? Colors.accentBorder : Colors.borderMd
@@ -47,20 +49,27 @@ export default function RouteOptionCard({ route, selected, onPress }: Props) {
     >
       {/* Tag + check */}
       <View className="flex-row items-center justify-between mb-2">
-        <Text
-          className="text-[11px]"
-          style={{
-            color: isRecommended ? Colors.accent : Colors.muted,
-            fontFamily: Fonts.bodySemiBold,
-          }}
-        >
-          {isRecommended ? '★ Recommended' : '⚡ Fastest'}
-        </Text>
+        <View className="flex-row items-center gap-1.5">
+          <Feather
+            name={isRecommended ? 'star' : 'zap'}
+            size={11}
+            color={isRecommended ? Colors.accent : Colors.muted}
+          />
+          <Text
+            className="text-[11px]"
+            style={{
+              color: isRecommended ? Colors.accent : Colors.muted,
+              fontFamily: Fonts.bodySemiBold,
+            }}
+          >
+            {isRecommended ? 'Recommended' : 'Fastest'}
+          </Text>
+        </View>
         {selected && (
           <Feather
             name="check-circle"
             size={15}
-            color={isRecommended ? Colors.accent : Colors.text}
+            color={isRecommended ? Colors.accent : Colors.borderMd}
           />
         )}
       </View>

@@ -10,12 +10,20 @@ interface Props {
 export default function CrowdTipCard({ message }: Props) {
   return (
     <View
-      className="rounded-2xl border p-4 flex-row items-start gap-3 mb-5"
+      className="rounded-2xl border p-4 mb-5"
       style={{ backgroundColor: Colors.accentBg, borderColor: Colors.accentBorder }}
     >
-      <Feather name="info" size={14} color={Colors.accent} style={{ marginTop: 1 }} />
+      <View className="flex-row items-center gap-2 mb-2">
+        <Feather name="info" size={13} color={Colors.accent} />
+        <Text
+          className="text-[11px] uppercase"
+          style={{ color: Colors.accent, fontFamily: Fonts.bodySemiBold, letterSpacing: 0.8 }}
+        >
+          Crowd Insight
+        </Text>
+      </View>
       <Text
-        className="text-[12px] flex-1"
+        className="text-[12px] leading-5"
         style={{ color: Colors.muted, fontFamily: Fonts.body }}
       >
         {message}

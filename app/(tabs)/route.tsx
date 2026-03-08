@@ -39,7 +39,9 @@ export default function RouteScreen() {
       >
         <RouteInputCard from="CLA Building (10)" to="Engineering Bldg 9" />
 
-        <SectionLabel>Suggested Routes</SectionLabel>
+        <View className="mt-2">
+          <SectionLabel>Suggested Routes</SectionLabel>
+        </View>
 
         {MOCK_ROUTES.map((route, i) => (
           <RouteOptionCard
