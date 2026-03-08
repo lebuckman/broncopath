@@ -53,30 +53,34 @@ This project was created following Agile Methodologies (Scrum) with an AI-augmen
 
 ## Getting Started
 
-> [!NOTE]
-> Expo Go (the standalone app) currently supports up to SDK 54. Since this project uses Expo SDK 55, development previews are run via the iOS Simulator through Xcode rather than the Expo Go app.
->
-> [Learn how to set up your development environment here](https://docs.expo.dev/get-started/set-up-your-environment/?platform=ios&device=simulated&mode=expo-go).
-
 ### Prerequisites
 
 - Node.js 18+
 - npm
-- Xcode (iOS)
+- Xcode 15+ with the iOS Simulator
 
 ### Installation
 
 ```bash
-# Clone the repo
 git clone https://github.com/lebuckman/broncopath.git
 cd broncopath
-
-# Install dependencies
 npm install
-
-# Start dev server (Ensure Xcode is installed and up to date)
-npx expo start --ios
 ```
+
+### Running on iOS
+
+BroncoPath uses Expo SDK 55, which requires a full native build — the prebuilt Expo Go app only supports up to SDK 54. Use `expo run:ios` instead of `expo start`.
+
+```bash
+npx expo run:ios
+```
+
+> [!Note]
+> Xcode compiles the native binary and installs it on the Simulator (first build takes a few minutes). Once it finishes, the Metro bundler starts and the app loads. If the Simulator doesn't jump straight to the app, find **BroncoPath** on its home screen and open it — Metro will connect automatically.
+>
+> From that point on, JavaScript changes hot-reload without a rebuild. You only need to re-run `expo run:ios` when you install a new native package.
+>
+> **Metro cache stale?** Run `npx expo start --clear` to flush it.
 
 ## Project Structure
 
