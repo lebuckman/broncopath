@@ -7,11 +7,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-npx expo start           # Start dev server (Expo Go / QR)
-npx expo start --ios     # Open iOS simulator
-npx expo start --android # Open Android emulator
+npm run ios              # expo run:ios  — full native build (required for SDK 55)
+npm run android          # expo run:android
 npx expo start --clear   # Clear Metro cache — use after any config change
 ```
+
+`expo run:ios` (not `expo start --ios`) is required because SDK 55 is not supported by the pre-built Expo Go binary. Any time new native packages are installed, the native binary must be rebuilt with `expo run:ios`.
 
 No test runner or linter is configured yet.
 
@@ -19,8 +20,7 @@ No test runner or linter is configured yet.
 
 ## Architecture
 
-**Entry point:** `index.ts` → `App.tsx` (standard Expo, not Expo Router yet).
-The `app/` directory and Expo Router are installed but not yet wired up — `package.json` `main` still points to `index.ts`. Switching to Expo Router requires changing `main` to `"expo-router/entry"`.
+**Entry point:** `expo-router/entry` → `app/_layout.tsx` (root layout) → `app/(tabs)/_layout.tsx` (tab navigator) → individual tab screens.
 
 **Styling — NativeWind v4:**
 - All components use `className` props. Do not mix `StyleSheet.create` and `className` in the same component; use `StyleSheet` only for values NativeWind cannot express (`shadowColor`, `elevation`).
@@ -34,8 +34,16 @@ The `app/` directory and Expo Router are installed but not yet wired up — `pac
 **Data flow:**
 All screens use mock data from `constants/mockData.ts`. The mock shapes exactly match the API contracts in `docs/contexts/REQUIREMENTS.md`, so switching to the live backend only requires changing the data source, not the components.
 
-**Build order:**
-Follow the 14-step sequence in `docs/contexts/REQUIREMENTS.md` § Build Order. One commit per step. Do not skip ahead.
+**Build order — current progress:**
+Steps 1–3 complete. Next is Step 4.
+- ✅ Step 1: NativeWind configured and verified
+- ✅ Step 2: Root `_layout.tsx` — fonts, dark bg, StatusBar, Expo Router entry
+- ✅ Step 3: Tab navigator — 4 tabs, Feather icons, active/inactive colors
+- ⬜ Step 4: `constants/colors.ts` + `constants/mockData.ts`
+- ⬜ Step 5: Primitive UI components (DensityDot, DensityBar, RoomBadge, SectionLabel)
+- ⬜ Steps 6–14: see `docs/contexts/REQUIREMENTS.md` § Build Order
+
+One commit per step. Do not skip ahead.
 
 ---
 
