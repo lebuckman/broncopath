@@ -1,7 +1,5 @@
 <div align="center">
 
-<br/>
-
 # 🐴 BroncoPath 🐴
 
 **Crowd-aware campus navigation for Cal Poly Pomona**
@@ -56,16 +54,15 @@ This project was created following Agile Methodologies (Scrum) with an AI-augmen
 ## Getting Started
 
 > [!NOTE]
-> Expo Go (the standalone app) currently supports up to SDK 54. Since this project uses Expo SDK 55, development previews are run via the iOS Simulator through Xcode rather than the Expo Go app. 
-> 
-> Ensure Xcode is installed and up to date before running `npx expo start --ios`.
+> Expo Go (the standalone app) currently supports up to SDK 54. Since this project uses Expo SDK 55, development previews are run via the iOS Simulator through Xcode rather than the Expo Go app.
+>
+> [Learn how to set up your development environment here](https://docs.expo.dev/get-started/set-up-your-environment/?platform=ios&device=simulated&mode=expo-go).
 
 ### Prerequisites
 
 - Node.js 18+
 - npm
-- Xcode (BroncoPath has only been tested in IOS)
-- Expo CLI: `npm install -g expo-cli`
+- Xcode (iOS)
 
 ### Installation
 
@@ -77,7 +74,7 @@ cd broncopath
 # Install dependencies
 npm install
 
-# Start the development server
+# Start dev server (Ensure Xcode is installed and up to date)
 npx expo start --ios
 ```
 
@@ -92,11 +89,13 @@ broncopath/
 │       ├── map.tsx             # Campus Map
 │       ├── rooms.tsx           # Find a Room
 │       └── route.tsx           # Route Planner
+│
 ├── components/
 │   ├── ui/                     # Primitive components
 │   ├── building/               # Building-specific components
 │   ├── map/                    # Map components
 │   └── route/                  # Route components
+│
 ├── constants/                  # Colors, mock data, types, config
 ├── hooks/                      # Custom data hooks
 ├── lib/                        # API fetch wrapper
@@ -105,6 +104,7 @@ broncopath/
 │   └── contexts/               # AI context references
 │       ├── DESIGN.md           # Visual design system
 │       └── REQUIREMENTS.md     # Engineering requirements & API contracts
+│
 └── backend/                    # Express API + Drizzle schema (WIP)
     ├── src/
     │   ├── routes/

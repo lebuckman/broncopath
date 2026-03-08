@@ -1,0 +1,1416 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BroncoPath — Use Case Analysis</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,wght@0,300;0,400;0,600;1,400&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      :root {
+        --green: #15803d;
+        --green-lt: #4ade80;
+        --green-bg: #f0fdf4;
+        --border: #d1fae5;
+        --gray: #374151;
+        --gray-lt: #6b7280;
+        --gray-bg: #f9fafb;
+        --dark: #111827;
+        --accent: #166534;
+      }
+
+      @media print {
+        body {
+          background: white;
+        }
+        .page {
+          box-shadow: none;
+          margin: 0;
+          border-radius: 0;
+        }
+        .page-break {
+          page-break-before: always;
+        }
+      }
+
+      body {
+        font-family: "DM Sans", sans-serif;
+        background: #e5e7eb;
+        color: var(--dark);
+        line-height: 1.6;
+        padding: 40px 20px;
+      }
+
+      .page {
+        max-width: 900px;
+        margin: 0 auto;
+        background: white;
+        border-radius: 4px;
+        box-shadow: 0 4px 32px rgba(0, 0, 0, 0.1);
+        overflow: hidden;
+      }
+
+      /* ── HEADER ────────────────────────────────────── */
+      .doc-header {
+        background: var(--green);
+        padding: 36px 48px 32px;
+        position: relative;
+        overflow: hidden;
+      }
+      .doc-header::after {
+        content: "";
+        position: absolute;
+        right: -60px;
+        top: -60px;
+        width: 220px;
+        height: 220px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.05);
+      }
+      .doc-meta {
+        font-family: "DM Mono", monospace;
+        font-size: 0.68rem;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: rgba(255, 255, 255, 0.6);
+        margin-bottom: 10px;
+      }
+      .doc-title {
+        font-family: "Source Serif 4", Georgia, serif;
+        font-size: 2rem;
+        font-weight: 600;
+        color: white;
+        letter-spacing: -0.02em;
+        line-height: 1.15;
+        margin-bottom: 6px;
+      }
+      .doc-title span {
+        font-style: italic;
+        opacity: 0.85;
+        font-weight: 300;
+      }
+      .doc-sub {
+        font-size: 0.82rem;
+        color: rgba(255, 255, 255, 0.65);
+        margin-top: 12px;
+        display: flex;
+        gap: 24px;
+        flex-wrap: wrap;
+      }
+      .doc-sub-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .doc-sub-item::before {
+        content: "·";
+        opacity: 0.4;
+      }
+      .doc-sub-item:first-child::before {
+        display: none;
+      }
+
+      /* ── BODY ──────────────────────────────────────── */
+      .doc-body {
+        padding: 48px 48px 56px;
+      }
+
+      /* ── SECTION ───────────────────────────────────── */
+      .section {
+        margin-bottom: 48px;
+      }
+      .section-num {
+        font-family: "DM Mono", monospace;
+        font-size: 0.65rem;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: var(--green);
+        margin-bottom: 6px;
+      }
+      .section-title {
+        font-family: "Source Serif 4", Georgia, serif;
+        font-size: 1.35rem;
+        font-weight: 600;
+        color: var(--dark);
+        letter-spacing: -0.01em;
+        padding-bottom: 10px;
+        border-bottom: 2px solid var(--green-bg);
+        margin-bottom: 20px;
+      }
+      .section-body {
+        font-size: 0.88rem;
+        color: var(--gray);
+        margin-bottom: 20px;
+        line-height: 1.75;
+        max-width: 680px;
+      }
+
+      /* ── ACTOR CARDS ───────────────────────────────── */
+      .actor-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+        margin-bottom: 16px;
+      }
+      .actor-card {
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 20px 22px;
+        position: relative;
+        overflow: hidden;
+      }
+      .actor-card::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+      }
+      .actor-card.primary::before {
+        background: var(--green);
+      }
+      .actor-card.secondary::before {
+        background: #60a5fa;
+      }
+      .actor-card.external::before {
+        background: #f59e0b;
+      }
+
+      .actor-type {
+        font-family: "DM Mono", monospace;
+        font-size: 0.62rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        margin-bottom: 6px;
+      }
+      .actor-card.primary .actor-type {
+        color: var(--green);
+      }
+      .actor-card.secondary .actor-type {
+        color: #2563eb;
+      }
+      .actor-card.external .actor-type {
+        color: #b45309;
+      }
+
+      .actor-name {
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--dark);
+        margin-bottom: 8px;
+      }
+      .actor-desc {
+        font-size: 0.78rem;
+        color: var(--gray-lt);
+        line-height: 1.65;
+      }
+
+      .actor-card.external-full {
+        grid-column: 1 / -1;
+      }
+
+      /* ── USE CASE TABLE ────────────────────────────── */
+      .uc-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.82rem;
+        margin-bottom: 28px;
+      }
+      .uc-table thead tr {
+        background: var(--green-bg);
+      }
+      .uc-table th {
+        padding: 10px 16px;
+        text-align: left;
+        font-weight: 600;
+        color: var(--green);
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        border-bottom: 2px solid var(--border);
+      }
+      .uc-table td {
+        padding: 11px 16px;
+        border-bottom: 1px solid #f3f4f6;
+        color: var(--gray);
+        vertical-align: top;
+        line-height: 1.55;
+      }
+      .uc-table tr:last-child td {
+        border-bottom: none;
+      }
+      .uc-table tr:hover td {
+        background: #fafafa;
+      }
+
+      .uc-id {
+        font-family: "DM Mono", monospace;
+        font-size: 0.7rem;
+        color: var(--green);
+        font-weight: 500;
+        white-space: nowrap;
+      }
+      .uc-name {
+        font-weight: 600;
+        color: var(--dark);
+      }
+
+      .actor-block {
+        margin-bottom: 28px;
+      }
+      .actor-block-label {
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: var(--dark);
+        padding: 8px 0 6px;
+        border-bottom: 1px solid var(--border);
+        margin-bottom: 2px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .actor-block-label .actor-pill {
+        font-family: "DM Mono", monospace;
+        font-size: 0.6rem;
+        padding: 2px 8px;
+        border-radius: 99px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+      .actor-pill.primary {
+        background: var(--green-bg);
+        color: var(--green);
+      }
+      .actor-pill.secondary {
+        background: #eff6ff;
+        color: #2563eb;
+      }
+      .actor-pill.external {
+        background: #fffbeb;
+        color: #b45309;
+      }
+
+      /* ── DIAGRAM SECTION ───────────────────────────── */
+      .diagram-wrap {
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        overflow: hidden;
+        background: #fafffe;
+      }
+      .diagram-caption {
+        padding: 10px 20px;
+        background: var(--green-bg);
+        border-bottom: 1px solid var(--border);
+        font-size: 0.72rem;
+        color: var(--green);
+        font-family: "DM Mono", monospace;
+        letter-spacing: 0.06em;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .note-box {
+        background: var(--green-bg);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 14px 18px;
+        font-size: 0.78rem;
+        color: var(--gray);
+        margin-top: 20px;
+        line-height: 1.65;
+      }
+      .note-box strong {
+        color: var(--green);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <!-- ── HEADER ──────────────────────────────────── -->
+      <div class="doc-header">
+        <div class="doc-meta">
+          CS 4800.02 · Software Engineering · Use Case Analysis
+        </div>
+        <div class="doc-title">BroncoPath <span>— Use Case Analysis</span></div>
+        <div class="doc-sub">
+          <div class="doc-sub-item">Cal Poly Pomona</div>
+          <div class="doc-sub-item">Spring 2026</div>
+          <div class="doc-sub-item">In Class Exercise — 2</div>
+          <div class="doc-sub-item">Source: BroncoPath Business Plan</div>
+        </div>
+      </div>
+
+      <!-- ── BODY ────────────────────────────────────── -->
+      <div class="doc-body">
+        <!-- ═══════════════════════════════════════════════
+         SECTION 1: ACTORS
+    ═══════════════════════════════════════════════ -->
+        <div class="section">
+          <div class="section-num">Section 1</div>
+          <div class="section-title">Actor Identification</div>
+          <p class="section-body">
+            Actors represent entities that interact with the BroncoPath system —
+            either by initiating use cases or by being depended upon for data or
+            services. Actors are categorized as Primary (main users driving
+            system behavior), Secondary (users with more limited interaction),
+            or External System (non-human entities that supply or consume data).
+          </p>
+
+          <div class="actor-grid">
+            <!-- Primary -->
+            <div class="actor-card primary">
+              <div class="actor-type">Primary Actor</div>
+              <div class="actor-name">CPP Student</div>
+              <div class="actor-desc">
+                The core end-user of BroncoPath. CPP students initiate the
+                majority of use cases — viewing occupancy, finding rooms,
+                planning routes, and exploring the campus map. Approximately
+                27,000 enrolled students at Cal Poly Pomona constitute this
+                actor group, with the highest-value segment being commuter
+                students and those with back-to-back schedules.
+              </div>
+            </div>
+
+            <!-- Secondary -->
+            <div class="actor-card secondary">
+              <div class="actor-type">Secondary Actor</div>
+              <div class="actor-name">Faculty / Staff</div>
+              <div class="actor-desc">
+                University employees who interact with a subset of BroncoPath's
+                features. Faculty and staff primarily use the system to locate
+                available meeting rooms and identify low-traffic building areas
+                between commitments. They share the same map and
+                room-availability interface as students but are not the primary
+                design target.
+              </div>
+            </div>
+
+            <!-- External System -->
+            <div class="actor-card external external-full">
+              <div class="actor-type">External System Actor</div>
+              <div class="actor-name">
+                CPP Schedule System &nbsp;<span
+                  style="
+                    font-size: 0.72rem;
+                    font-weight: 400;
+                    color: var(--gray-lt);
+                  "
+                  >(schedule.cpp.edu)</span
+                >
+              </div>
+              <div class="actor-desc">
+                A non-human actor representing Cal Poly Pomona's publicly
+                available class schedule system. Updated nightly, this system
+                provides the course schedule data — including building, room
+                number, days, and meeting times — that BroncoPath's Python
+                scraper ingests to calculate building occupancy predictions. The
+                system is read-only from BroncoPath's perspective; no data is
+                written back. This is the foundational data dependency for the
+                entire crowd prediction engine.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ═══════════════════════════════════════════════
+         SECTION 2: USE CASES PER ACTOR
+    ═══════════════════════════════════════════════ -->
+        <div class="section">
+          <div class="section-num">Section 2</div>
+          <div class="section-title">Use Cases by Actor</div>
+          <p class="section-body">
+            The following use cases are derived from the core features defined
+            in the BroncoPath Business Plan. Each use case describes a
+            goal-oriented interaction between an actor and the system.
+          </p>
+
+          <!-- STUDENT USE CASES -->
+          <div class="actor-block">
+            <div class="actor-block-label">
+              CPP Student
+              <span class="actor-pill primary">Primary</span>
+            </div>
+            <table class="uc-table">
+              <thead>
+                <tr>
+                  <th style="width: 80px">ID</th>
+                  <th style="width: 210px">Use Case</th>
+                  <th>Description</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="uc-id">UC-S01</td>
+                  <td class="uc-name">View Real-Time Dashboard</td>
+                  <td>
+                    Student opens the app and sees an at-a-glance summary of
+                    building occupancy levels across campus at the current time.
+                    The dashboard surfaces the quietest buildings and flags
+                    high-traffic zones without requiring any input.
+                  </td>
+                </tr>
+                <tr>
+                  <td class="uc-id">UC-S02</td>
+                  <td class="uc-name">View Campus Map</td>
+                  <td>
+                    Student browses an interactive campus map of CPP with all
+                    major buildings rendered as color-coded markers (green /
+                    yellow / red) based on predicted occupancy. Tapping a
+                    building opens its detail view. <em>Includes: UC-S03.</em>
+                  </td>
+                </tr>
+                <tr>
+                  <td class="uc-id">UC-S03</td>
+                  <td class="uc-name">Check Building Occupancy</td>
+                  <td>
+                    Student views the predicted crowd level for a selected
+                    building at the current time — including an occupancy
+                    percentage score, a density label (Low / Moderate / High),
+                    and a room-by-room availability breakdown. This use case is
+                    included by UC-S02, UC-S04, and UC-S05.
+                  </td>
+                </tr>
+                <tr>
+                  <td class="uc-id">UC-S04</td>
+                  <td class="uc-name">Find Available Room</td>
+                  <td>
+                    Student searches for free classrooms, study rooms, or open
+                    spaces within a selected building. Results show room number,
+                    room type, seat count, and current status (Free / In Use /
+                    Frees at [time]). <em>Includes: UC-S03.</em>
+                  </td>
+                </tr>
+                <tr>
+                  <td class="uc-id">UC-S05</td>
+                  <td class="uc-name">Plan Crowd-Aware Route</td>
+                  <td>
+                    Student selects a starting point and a destination on campus
+                    and receives ranked route options. Each option displays
+                    estimated walk time, distance, and crowd level along the
+                    path. The recommended route prioritizes crowd avoidance over
+                    shortest distance. <em>Includes: UC-S03.</em>
+                  </td>
+                </tr>
+                <tr>
+                  <td class="uc-id">UC-S06</td>
+                  <td class="uc-name">Filter Buildings by Density</td>
+                  <td>
+                    Student applies a density filter (All / Quiet / Moderate /
+                    Busy) to the campus map view, causing buildings that do not
+                    match the selected level to visually dim. This helps
+                    students quickly identify low-traffic zones.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- FACULTY USE CASES -->
+          <div class="actor-block">
+            <div class="actor-block-label">
+              Faculty / Staff
+              <span class="actor-pill secondary">Secondary</span>
+            </div>
+            <table class="uc-table">
+              <thead>
+                <tr>
+                  <th style="width: 80px">ID</th>
+                  <th style="width: 210px">Use Case</th>
+                  <th>Description</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="uc-id">UC-F01</td>
+                  <td class="uc-name">Check Building Occupancy</td>
+                  <td>
+                    Faculty or staff member views the predicted occupancy level
+                    for a building they plan to visit or schedule a meeting in.
+                    Shares the same underlying use case as UC-S03, invoked
+                    through the campus map or building search.
+                  </td>
+                </tr>
+                <tr>
+                  <td class="uc-id">UC-F02</td>
+                  <td class="uc-name">Find Available Room</td>
+                  <td>
+                    Faculty or staff member searches for an available meeting
+                    room or quiet workspace within a building. Identical in flow
+                    to UC-S04 — the actor distinction is in intent (scheduled
+                    meetings vs. ad-hoc study) rather than system behavior.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- EXTERNAL SYSTEM USE CASES -->
+          <div class="actor-block">
+            <div class="actor-block-label">
+              CPP Schedule System
+              <span class="actor-pill external">External System</span>
+            </div>
+            <table class="uc-table">
+              <thead>
+                <tr>
+                  <th style="width: 80px">ID</th>
+                  <th style="width: 210px">Use Case</th>
+                  <th>Description</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="uc-id">UC-E01</td>
+                  <td class="uc-name">Provide Schedule Data</td>
+                  <td>
+                    BroncoPath's Python scraper queries schedule.cpp.edu to
+                    retrieve the current semester's course schedule data —
+                    including course name, section, building, room number, days
+                    of week, start and end times, and enrollment capacity. This
+                    data feeds the crowd prediction engine. The CPP Schedule
+                    System updates its data nightly; BroncoPath re-scrapes on a
+                    matching schedule to keep predictions current.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="note-box">
+            <strong>Note on &lt;&lt;include&gt;&gt; relationships:</strong>
+            UC-S03 (Check Building Occupancy) is the central dependency of the
+            system. It is <em>included</em> by UC-S02 (View Campus Map), UC-S04
+            (Find Available Room), and UC-S05 (Plan Crowd-Aware Route). This
+            reflects the architectural reality that the occupancy prediction
+            engine is invoked by every feature that displays crowd data. These
+            relationships are depicted in the diagram below.
+          </div>
+        </div>
+
+        <!-- ═══════════════════════════════════════════════
+         SECTION 3: USE CASE DIAGRAM
+    ═══════════════════════════════════════════════ -->
+        <div class="section">
+          <div class="section-num">Section 3</div>
+          <div class="section-title">Use Case Diagram</div>
+          <p class="section-body">
+            The diagram below presents the main use cases for BroncoPath
+            following UML notation. Solid lines represent actor–use case
+            associations. Dashed arrows labeled
+            <em>&lt;&lt;include&gt;&gt;</em> indicate that the base use case
+            always invokes the included use case as part of its flow.
+          </p>
+
+          <div class="diagram-wrap">
+            <div class="diagram-caption">
+              <span
+                >Fig 1 — BroncoPath High-Level Use Case Diagram (UML 2.x)</span
+              >
+              <span>Generated: Spring 2026</span>
+            </div>
+
+            <!-- ═══ SVG USE CASE DIAGRAM ═══ -->
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 900 570"
+              width="100%"
+              style="
+                display: block;
+                background: white;
+                font-family: &quot;DM Sans&quot;, sans-serif;
+              "
+            >
+              <defs>
+                <!-- Include arrow: open triangle, pointing to included UC -->
+                <marker
+                  id="arr-include"
+                  markerWidth="11"
+                  markerHeight="8"
+                  refX="10"
+                  refY="4"
+                  orient="auto"
+                  markerUnits="strokeWidth"
+                >
+                  <polyline
+                    points="0,0 10,4 0,8"
+                    fill="none"
+                    stroke="#6b7280"
+                    stroke-width="1.2"
+                    stroke-linejoin="round"
+                    stroke-linecap="round"
+                  />
+                </marker>
+              </defs>
+
+              <!-- ── SYSTEM BOUNDARY ─────────────────────── -->
+              <rect
+                x="195"
+                y="48"
+                width="540"
+                height="480"
+                rx="10"
+                ry="10"
+                fill="#fafffe"
+                stroke="#15803d"
+                stroke-width="1.8"
+              />
+
+              <!-- System stereotype label -->
+              <text
+                x="465"
+                y="74"
+                text-anchor="middle"
+                font-family="'DM Mono',monospace"
+                font-size="10"
+                fill="#6b7280"
+                letter-spacing="1"
+              >
+                «system»
+              </text>
+
+              <!-- System name -->
+              <text
+                x="465"
+                y="96"
+                text-anchor="middle"
+                font-family="'Source Serif 4',Georgia,serif"
+                font-size="20"
+                font-weight="600"
+                fill="#15803d"
+                letter-spacing="-0.5"
+              >
+                BroncoPath
+              </text>
+
+              <!-- ── USE CASE ELLIPSES ───────────────────── -->
+
+              <!-- UC-S01: View Real-Time Dashboard -->
+              <ellipse
+                cx="348"
+                cy="155"
+                rx="115"
+                ry="32"
+                fill="white"
+                stroke="#15803d"
+                stroke-width="1.5"
+              />
+              <text
+                x="348"
+                y="150"
+                text-anchor="middle"
+                font-size="11"
+                font-weight="600"
+                fill="#111827"
+              >
+                View Real-Time
+              </text>
+              <text
+                x="348"
+                y="165"
+                text-anchor="middle"
+                font-size="11"
+                font-weight="600"
+                fill="#111827"
+              >
+                Dashboard
+              </text>
+              <text
+                x="348"
+                y="178"
+                text-anchor="middle"
+                font-size="9"
+                fill="#6b7280"
+                font-family="'DM Mono',monospace"
+              >
+                UC-S01
+              </text>
+
+              <!-- UC-S02: View Campus Map -->
+              <ellipse
+                cx="610"
+                cy="155"
+                rx="105"
+                ry="32"
+                fill="white"
+                stroke="#15803d"
+                stroke-width="1.5"
+              />
+              <text
+                x="610"
+                y="150"
+                text-anchor="middle"
+                font-size="11"
+                font-weight="600"
+                fill="#111827"
+              >
+                View Campus
+              </text>
+              <text
+                x="610"
+                y="165"
+                text-anchor="middle"
+                font-size="11"
+                font-weight="600"
+                fill="#111827"
+              >
+                Map
+              </text>
+              <text
+                x="610"
+                y="178"
+                text-anchor="middle"
+                font-size="9"
+                fill="#6b7280"
+                font-family="'DM Mono',monospace"
+              >
+                UC-S02
+              </text>
+
+              <!-- UC-S03: Check Building Occupancy (CENTER / INCLUDED) -->
+              <ellipse
+                cx="478"
+                cy="300"
+                rx="118"
+                ry="34"
+                fill="#f0fdf4"
+                stroke="#15803d"
+                stroke-width="2"
+              />
+              <text
+                x="478"
+                y="293"
+                text-anchor="middle"
+                font-size="11"
+                font-weight="600"
+                fill="#15803d"
+              >
+                Check Building
+              </text>
+              <text
+                x="478"
+                y="308"
+                text-anchor="middle"
+                font-size="11"
+                font-weight="600"
+                fill="#15803d"
+              >
+                Occupancy
+              </text>
+              <text
+                x="478"
+                y="323"
+                text-anchor="middle"
+                font-size="9"
+                fill="#6b7280"
+                font-family="'DM Mono',monospace"
+              >
+                UC-S03
+              </text>
+
+              <!-- UC-S04: Find Available Room -->
+              <ellipse
+                cx="340"
+                cy="450"
+                rx="115"
+                ry="32"
+                fill="white"
+                stroke="#15803d"
+                stroke-width="1.5"
+              />
+              <text
+                x="340"
+                y="445"
+                text-anchor="middle"
+                font-size="11"
+                font-weight="600"
+                fill="#111827"
+              >
+                Find Available
+              </text>
+              <text
+                x="340"
+                y="460"
+                text-anchor="middle"
+                font-size="11"
+                font-weight="600"
+                fill="#111827"
+              >
+                Room
+              </text>
+              <text
+                x="340"
+                y="473"
+                text-anchor="middle"
+                font-size="9"
+                fill="#6b7280"
+                font-family="'DM Mono',monospace"
+              >
+                UC-S04
+              </text>
+
+              <!-- UC-S05: Plan Crowd-Aware Route -->
+              <ellipse
+                cx="614"
+                cy="450"
+                rx="110"
+                ry="32"
+                fill="white"
+                stroke="#15803d"
+                stroke-width="1.5"
+              />
+              <text
+                x="614"
+                y="445"
+                text-anchor="middle"
+                font-size="11"
+                font-weight="600"
+                fill="#111827"
+              >
+                Plan Crowd-Aware
+              </text>
+              <text
+                x="614"
+                y="460"
+                text-anchor="middle"
+                font-size="11"
+                font-weight="600"
+                fill="#111827"
+              >
+                Route
+              </text>
+              <text
+                x="614"
+                y="473"
+                text-anchor="middle"
+                font-size="9"
+                fill="#6b7280"
+                font-family="'DM Mono',monospace"
+              >
+                UC-S05
+              </text>
+
+              <!-- ── ACTOR: CPP Student (Primary) ────────── -->
+              <!-- Stick figure centered at (72, 200) -->
+              <!-- head -->
+              <circle
+                cx="72"
+                cy="172"
+                r="16"
+                fill="none"
+                stroke="#1e293b"
+                stroke-width="1.8"
+              />
+              <!-- body -->
+              <line
+                x1="72"
+                y1="188"
+                x2="72"
+                y2="224"
+                stroke="#1e293b"
+                stroke-width="1.8"
+              />
+              <!-- arms -->
+              <line
+                x1="50"
+                y1="204"
+                x2="94"
+                y2="204"
+                stroke="#1e293b"
+                stroke-width="1.8"
+              />
+              <!-- left leg -->
+              <line
+                x1="72"
+                y1="224"
+                x2="55"
+                y2="252"
+                stroke="#1e293b"
+                stroke-width="1.8"
+              />
+              <!-- right leg -->
+              <line
+                x1="72"
+                y1="224"
+                x2="89"
+                y2="252"
+                stroke="#1e293b"
+                stroke-width="1.8"
+              />
+              <!-- name label -->
+              <text
+                x="72"
+                y="270"
+                text-anchor="middle"
+                font-size="11"
+                font-weight="600"
+                fill="#111827"
+              >
+                CPP Student
+              </text>
+              <!-- stereotype -->
+              <text
+                x="72"
+                y="283"
+                text-anchor="middle"
+                font-size="9"
+                fill="#15803d"
+                font-family="'DM Mono',monospace"
+              >
+                «primary»
+              </text>
+
+              <!-- ── ACTOR: Faculty / Staff (Secondary) ──── -->
+              <!-- centered at (72, 400) -->
+              <circle
+                cx="72"
+                cy="380"
+                r="16"
+                fill="none"
+                stroke="#1e293b"
+                stroke-width="1.8"
+                stroke-dasharray="4,2"
+              />
+              <line
+                x1="72"
+                y1="396"
+                x2="72"
+                y2="430"
+                stroke="#1e293b"
+                stroke-width="1.8"
+              />
+              <line
+                x1="52"
+                y1="410"
+                x2="92"
+                y2="410"
+                stroke="#1e293b"
+                stroke-width="1.8"
+              />
+              <line
+                x1="72"
+                y1="430"
+                x2="57"
+                y2="456"
+                stroke="#1e293b"
+                stroke-width="1.8"
+              />
+              <line
+                x1="72"
+                y1="430"
+                x2="87"
+                y2="456"
+                stroke="#1e293b"
+                stroke-width="1.8"
+              />
+              <text
+                x="72"
+                y="474"
+                text-anchor="middle"
+                font-size="11"
+                font-weight="600"
+                fill="#111827"
+              >
+                Faculty / Staff
+              </text>
+              <text
+                x="72"
+                y="487"
+                text-anchor="middle"
+                font-size="9"
+                fill="#2563eb"
+                font-family="'DM Mono',monospace"
+              >
+                «secondary»
+              </text>
+
+              <!-- ── ACTOR: CPP Schedule System (External) ─ -->
+              <!-- box-style external system, centered at (840, 295) -->
+              <rect
+                x="786"
+                y="248"
+                width="102"
+                height="94"
+                rx="6"
+                fill="#fffbeb"
+                stroke="#b45309"
+                stroke-width="1.5"
+              />
+              <!-- database stack lines for visual flavor -->
+              <line
+                x1="786"
+                y1="272"
+                x2="888"
+                y2="272"
+                stroke="#b45309"
+                stroke-width="0.8"
+                opacity="0.4"
+              />
+              <line
+                x1="786"
+                y1="284"
+                x2="888"
+                y2="284"
+                stroke="#b45309"
+                stroke-width="0.8"
+                opacity="0.4"
+              />
+              <text
+                x="837"
+                y="267"
+                text-anchor="middle"
+                font-size="8.5"
+                font-family="'DM Mono',monospace"
+                fill="#b45309"
+                letter-spacing="0.5"
+              >
+                «external»
+              </text>
+              <text
+                x="837"
+                y="300"
+                text-anchor="middle"
+                font-size="10.5"
+                font-weight="600"
+                fill="#78350f"
+              >
+                CPP Schedule
+              </text>
+              <text
+                x="837"
+                y="315"
+                text-anchor="middle"
+                font-size="10.5"
+                font-weight="600"
+                fill="#78350f"
+              >
+                System
+              </text>
+              <text
+                x="837"
+                y="334"
+                text-anchor="middle"
+                font-size="8.5"
+                fill="#b45309"
+                font-family="'DM Mono',monospace"
+              >
+                schedule.cpp.edu
+              </text>
+
+              <!-- ── ASSOCIATION LINES (solid) ──────────────
+               Student → UC-S01, UC-S02, UC-S04, UC-S05
+               Faculty → UC-S04, UC-S03
+               ExtSys  → UC-S03
+          ────────────────────────────────────────────── -->
+
+              <!-- Student (92, 210) → UC-S01 (233, 155) -->
+              <line
+                x1="92"
+                y1="210"
+                x2="233"
+                y2="155"
+                stroke="#374151"
+                stroke-width="1.4"
+              />
+
+              <!-- Student (92, 210) → UC-S02 (505, 148) -->
+              <line
+                x1="92"
+                y1="210"
+                x2="505"
+                y2="148"
+                stroke="#374151"
+                stroke-width="1.4"
+              />
+
+              <!-- Student (90, 225) → UC-S04 (225, 445) -->
+              <line
+                x1="90"
+                y1="228"
+                x2="225"
+                y2="443"
+                stroke="#374151"
+                stroke-width="1.4"
+              />
+
+              <!-- Student (90, 225) → UC-S05 (504, 445) -->
+              <line
+                x1="90"
+                y1="228"
+                x2="504"
+                y2="445"
+                stroke="#374151"
+                stroke-width="1.4"
+              />
+
+              <!-- Faculty (90, 410) → UC-S04 (225, 450) -->
+              <line
+                x1="90"
+                y1="415"
+                x2="225"
+                y2="449"
+                stroke="#374151"
+                stroke-width="1.4"
+              />
+
+              <!-- Faculty (92, 395) → UC-S03 (360, 300) -->
+              <line
+                x1="92"
+                y1="398"
+                x2="360"
+                y2="307"
+                stroke="#374151"
+                stroke-width="1.4"
+              />
+
+              <!-- ExtSys left edge (786, 295) → UC-S03 right edge (596, 300) -->
+              <line
+                x1="786"
+                y1="295"
+                x2="596"
+                y2="300"
+                stroke="#b45309"
+                stroke-width="1.4"
+                stroke-dasharray="5,3"
+              />
+              <!-- small label on this line -->
+              <text
+                x="700"
+                y="288"
+                text-anchor="middle"
+                font-size="8.5"
+                font-family="'DM Mono',monospace"
+                fill="#b45309"
+              >
+                provides data
+              </text>
+
+              <!-- ── INCLUDE RELATIONSHIPS (dashed arrows) ──
+               UC-S01 → UC-S03
+               UC-S02 → UC-S03
+               UC-S04 → UC-S03
+               UC-S05 → UC-S03
+          ────────────────────────────────────────────── -->
+
+              <!-- UC-S01 (348,155) → UC-S03 (478,300) -->
+              <!-- exit UC-S01 at bottom-right ≈(413,175), enter UC-S03 at top-left ≈(410,268) -->
+              <line
+                x1="413"
+                y1="175"
+                x2="415"
+                y2="267"
+                stroke="#6b7280"
+                stroke-width="1.2"
+                stroke-dasharray="5,3"
+                marker-end="url(#arr-include)"
+              />
+              <rect
+                x="388"
+                y="212"
+                width="72"
+                height="16"
+                rx="3"
+                fill="white"
+              />
+              <text
+                x="424"
+                y="223"
+                text-anchor="middle"
+                font-size="8.5"
+                font-family="'DM Mono',monospace"
+                fill="#6b7280"
+              >
+                «include»
+              </text>
+
+              <!-- UC-S02 (610,155) → UC-S03 (478,300) -->
+              <!-- exit UC-S02 bottom-left ≈(545,174), enter UC-S03 top-right ≈(545,268) -->
+              <line
+                x1="553"
+                y1="174"
+                x2="548"
+                y2="267"
+                stroke="#6b7280"
+                stroke-width="1.2"
+                stroke-dasharray="5,3"
+                marker-end="url(#arr-include)"
+              />
+              <rect
+                x="520"
+                y="212"
+                width="72"
+                height="16"
+                rx="3"
+                fill="white"
+              />
+              <text
+                x="556"
+                y="223"
+                text-anchor="middle"
+                font-size="8.5"
+                font-family="'DM Mono',monospace"
+                fill="#6b7280"
+              >
+                «include»
+              </text>
+
+              <!-- UC-S04 (340,450) → UC-S03 (478,300) -->
+              <!-- exit UC-S04 top ≈(382,420), enter UC-S03 bottom-left ≈(408,332) -->
+              <line
+                x1="385"
+                y1="420"
+                x2="418"
+                y2="332"
+                stroke="#6b7280"
+                stroke-width="1.2"
+                stroke-dasharray="5,3"
+                marker-end="url(#arr-include)"
+              />
+              <rect
+                x="360"
+                y="368"
+                width="72"
+                height="16"
+                rx="3"
+                fill="white"
+              />
+              <text
+                x="396"
+                y="379"
+                text-anchor="middle"
+                font-size="8.5"
+                font-family="'DM Mono',monospace"
+                fill="#6b7280"
+              >
+                «include»
+              </text>
+
+              <!-- UC-S05 (614,450) → UC-S03 (478,300) -->
+              <!-- exit UC-S05 top ≈(570,420), enter UC-S03 bottom-right ≈(543,332) -->
+              <line
+                x1="570"
+                y1="420"
+                x2="544"
+                y2="332"
+                stroke="#6b7280"
+                stroke-width="1.2"
+                stroke-dasharray="5,3"
+                marker-end="url(#arr-include)"
+              />
+              <rect
+                x="517"
+                y="368"
+                width="72"
+                height="16"
+                rx="3"
+                fill="white"
+              />
+              <text
+                x="553"
+                y="379"
+                text-anchor="middle"
+                font-size="8.5"
+                font-family="'DM Mono',monospace"
+                fill="#6b7280"
+              >
+                «include»
+              </text>
+
+              <!-- ── LEGEND ──────────────────────────────── -->
+              <rect
+                x="210"
+                y="510"
+                width="500"
+                height="28"
+                rx="6"
+                fill="#f9fafb"
+              />
+              <line
+                x1="226"
+                y1="524"
+                x2="258"
+                y2="524"
+                stroke="#374151"
+                stroke-width="1.4"
+              />
+              <text x="264" y="528" font-size="9.5" fill="#6b7280">
+                Association
+              </text>
+
+              <line
+                x1="318"
+                y1="524"
+                x2="350"
+                y2="524"
+                stroke="#6b7280"
+                stroke-width="1.2"
+                stroke-dasharray="4,2"
+              />
+              <polyline
+                points="348,520 358,524 348,528"
+                fill="none"
+                stroke="#6b7280"
+                stroke-width="1.2"
+              />
+              <text x="366" y="528" font-size="9.5" fill="#6b7280">
+                «include»
+              </text>
+
+              <line
+                x1="432"
+                y1="524"
+                x2="464"
+                y2="524"
+                stroke="#b45309"
+                stroke-width="1.4"
+                stroke-dasharray="4,2"
+              />
+              <text x="470" y="528" font-size="9.5" fill="#6b7280">
+                External Data Feed
+              </text>
+
+              <rect
+                x="565"
+                y="516"
+                width="12"
+                height="16"
+                rx="2"
+                fill="#f0fdf4"
+                stroke="#15803d"
+                stroke-width="1"
+              />
+              <text x="583" y="528" font-size="9.5" fill="#6b7280">
+                Included Use Case
+              </text>
+            </svg>
+            <!-- ── END SVG ── -->
+          </div>
+
+          <div class="note-box" style="margin-top: 16px">
+            <strong>Diagram Notes:</strong> UC-S03 (Check Building Occupancy) is
+            rendered with a green fill to visually denote its role as the
+            central included use case — the occupancy prediction engine that all
+            data-surfacing features depend on. The CPP Schedule System is
+            depicted as a rectangular box (rather than a stick figure) to
+            distinguish it as a non-human external system actor. Faculty/Staff
+            connections use a dashed-outline figure to differentiate them
+            visually from the primary actor.
+          </div>
+        </div>
+      </div>
+      <!-- /doc-body -->
+    </div>
+    <!-- /page -->
+  </body>
+</html>

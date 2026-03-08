@@ -1,0 +1,654 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Smart Campus Navigator — Project Pitch</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Outfit:wght@300;400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      :root {
+        --green: #2ecc71;
+        --green-dim: #1a7a43;
+        --yellow: #f7c948;
+        --red: #e74c3c;
+        --bg: #0a0f0d;
+        --bg2: #111a14;
+        --card: #141e17;
+        --border: rgba(46, 204, 113, 0.15);
+        --text: #e8f0eb;
+        --muted: #7a9882;
+        --accent: #2ecc71;
+      }
+
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: "Outfit", sans-serif;
+        font-weight: 300;
+        min-height: 100vh;
+        overflow-x: hidden;
+      }
+
+      /* Grid bg */
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background-image:
+          linear-gradient(rgba(46, 204, 113, 0.04) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(46, 204, 113, 0.04) 1px, transparent 1px);
+        background-size: 40px 40px;
+        pointer-events: none;
+        z-index: 0;
+      }
+
+      .wrapper {
+        position: relative;
+        z-index: 1;
+        max-width: 860px;
+        margin: 0 auto;
+        padding: 60px 32px 100px;
+      }
+
+      /* HEADER */
+      .header {
+        margin-bottom: 56px;
+      }
+
+      .eyebrow {
+        font-family: "DM Mono", monospace;
+        font-size: 11px;
+        letter-spacing: 0.2em;
+        color: var(--accent);
+        text-transform: uppercase;
+        margin-bottom: 16px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .eyebrow::before {
+        content: "";
+        display: inline-block;
+        width: 32px;
+        height: 1px;
+        background: var(--accent);
+      }
+
+      .title {
+        font-family: "DM Serif Display", serif;
+        font-size: clamp(2.6rem, 6vw, 4.2rem);
+        line-height: 1.05;
+        color: #fff;
+        letter-spacing: -0.02em;
+        margin-bottom: 8px;
+      }
+
+      .title em {
+        font-style: italic;
+        color: var(--accent);
+      }
+
+      .subtitle {
+        font-size: 1.05rem;
+        color: var(--muted);
+        margin-top: 14px;
+        max-width: 520px;
+        line-height: 1.7;
+      }
+
+      /* PROBLEM BANNER */
+      .problem-banner {
+        border: 1px solid var(--border);
+        border-left: 3px solid var(--accent);
+        background: var(--card);
+        border-radius: 4px 12px 12px 4px;
+        padding: 24px 28px;
+        margin-bottom: 48px;
+      }
+
+      .problem-banner .label {
+        font-family: "DM Mono", monospace;
+        font-size: 10px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--accent);
+        margin-bottom: 10px;
+      }
+
+      .problem-banner p {
+        font-size: 1rem;
+        line-height: 1.75;
+        color: var(--text);
+      }
+
+      .problem-banner strong {
+        color: #fff;
+        font-weight: 500;
+      }
+
+      /* SECTION HEADERS */
+      .section-label {
+        font-family: "DM Mono", monospace;
+        font-size: 10px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .section-label::after {
+        content: "";
+        flex: 1;
+        height: 1px;
+        background: var(--border);
+      }
+
+      /* FEATURE GRID */
+      .feature-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+        margin-bottom: 48px;
+      }
+
+      @media (max-width: 580px) {
+        .feature-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .feature-card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 24px;
+        transition:
+          border-color 0.2s,
+          transform 0.2s;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .feature-card:hover {
+        border-color: rgba(46, 204, 113, 0.4);
+        transform: translateY(-2px);
+      }
+
+      .feature-card::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: linear-gradient(90deg, var(--accent), transparent);
+        opacity: 0;
+        transition: opacity 0.2s;
+      }
+
+      .feature-card:hover::after {
+        opacity: 1;
+      }
+
+      .feature-icon {
+        font-size: 1.6rem;
+        margin-bottom: 12px;
+      }
+
+      .feature-card h3 {
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: #fff;
+        margin-bottom: 8px;
+        letter-spacing: -0.01em;
+      }
+
+      .feature-card p {
+        font-size: 0.85rem;
+        color: var(--muted);
+        line-height: 1.65;
+      }
+
+      /* OCCUPANCY DEMO */
+      .occ-section {
+        margin-bottom: 48px;
+      }
+
+      .building-row {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 14px 20px;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        background: var(--card);
+        margin-bottom: 10px;
+        transition: background 0.2s;
+      }
+
+      .building-row:hover {
+        background: #182120;
+      }
+
+      .bldg-name {
+        font-size: 0.9rem;
+        font-weight: 500;
+        color: #fff;
+        width: 200px;
+        flex-shrink: 0;
+      }
+
+      .bldg-time {
+        font-family: "DM Mono", monospace;
+        font-size: 0.75rem;
+        color: var(--muted);
+        flex: 1;
+      }
+
+      .density-bar-wrap {
+        width: 160px;
+        height: 6px;
+        background: rgba(255, 255, 255, 0.07);
+        border-radius: 99px;
+        overflow: hidden;
+        flex-shrink: 0;
+      }
+
+      .density-bar {
+        height: 100%;
+        border-radius: 99px;
+        transition: width 0.6s ease;
+      }
+
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        flex-shrink: 0;
+      }
+
+      .dot.low {
+        background: var(--green);
+        box-shadow: 0 0 8px var(--green);
+      }
+      .dot.med {
+        background: var(--yellow);
+        box-shadow: 0 0 8px var(--yellow);
+      }
+      .dot.high {
+        background: var(--red);
+        box-shadow: 0 0 8px var(--red);
+      }
+      .bar-low {
+        background: var(--green);
+        width: 22%;
+      }
+      .bar-med {
+        background: var(--yellow);
+        width: 61%;
+      }
+      .bar-high {
+        background: var(--red);
+        width: 88%;
+      }
+
+      .status-text {
+        font-family: "DM Mono", monospace;
+        font-size: 0.7rem;
+        width: 40px;
+        text-align: right;
+        flex-shrink: 0;
+      }
+      .status-text.low {
+        color: var(--green);
+      }
+      .status-text.med {
+        color: var(--yellow);
+      }
+      .status-text.high {
+        color: var(--red);
+      }
+
+      /* SPRINT TIMELINE */
+      .timeline {
+        margin-bottom: 48px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+
+      @media (max-width: 560px) {
+        .timeline {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .sprint-card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 24px;
+      }
+
+      .sprint-num {
+        font-family: "DM Mono", monospace;
+        font-size: 10px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--accent);
+        margin-bottom: 6px;
+      }
+
+      .sprint-card h3 {
+        font-size: 1rem;
+        font-weight: 600;
+        color: #fff;
+        margin-bottom: 14px;
+      }
+
+      .sprint-card ul {
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .sprint-card ul li {
+        font-size: 0.83rem;
+        color: var(--muted);
+        display: flex;
+        gap: 8px;
+        line-height: 1.5;
+      }
+
+      .sprint-card ul li::before {
+        content: "→";
+        color: var(--accent);
+        flex-shrink: 0;
+        font-family: "DM Mono", monospace;
+      }
+
+      /* TECH STACK */
+      .stack-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 48px;
+      }
+
+      .tag {
+        font-family: "DM Mono", monospace;
+        font-size: 0.75rem;
+        padding: 6px 14px;
+        border: 1px solid var(--border);
+        border-radius: 99px;
+        color: var(--muted);
+        background: var(--card);
+        transition: all 0.2s;
+      }
+
+      .tag:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+
+      .tag.highlight {
+        border-color: rgba(46, 204, 113, 0.4);
+        color: var(--accent);
+        background: rgba(46, 204, 113, 0.07);
+      }
+
+      /* BOTTOM CTA */
+      .cta-box {
+        border: 1px solid var(--border);
+        background: linear-gradient(
+          135deg,
+          rgba(46, 204, 113, 0.06),
+          transparent
+        );
+        border-radius: 16px;
+        padding: 36px;
+        text-align: center;
+      }
+
+      .cta-box h2 {
+        font-family: "DM Serif Display", serif;
+        font-size: 1.8rem;
+        color: #fff;
+        margin-bottom: 12px;
+      }
+
+      .cta-box p {
+        color: var(--muted);
+        font-size: 0.95rem;
+        line-height: 1.7;
+        max-width: 460px;
+        margin: 0 auto;
+      }
+
+      .divider {
+        height: 1px;
+        background: var(--border);
+        margin: 48px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrapper">
+      <!-- HEADER -->
+      <header class="header">
+        <div class="eyebrow">CS 4800 · Spring 2026 · Project Pitch</div>
+        <h1 class="title">Smart Campus<br /><em>Navigator</em></h1>
+        <p class="subtitle">
+          A mobile app that replaces CPP's outdated interactive map — giving
+          students real-time building occupancy predictions, classroom
+          availability, and smart route suggestions across campus.
+        </p>
+      </header>
+
+      <!-- THE PROBLEM -->
+      <div class="problem-banner">
+        <div class="label">The Problem</div>
+        <p>
+          CPP's current campus map is <strong>static and unintelligent</strong>.
+          It can't tell you whether the library is packed right now, which
+          buildings are quietest between classes, or the fastest uncrowded path
+          to your next lecture. Students waste time navigating blindly, showing
+          up to overcrowded study spaces, or wandering unfamiliar buildings.
+          <strong>This app fixes that.</strong>
+        </p>
+      </div>
+
+      <!-- CORE FEATURES -->
+      <div class="section-label">Core Features · MVP</div>
+      <div class="feature-grid">
+        <div class="feature-card">
+          <div class="feature-icon">🗺️</div>
+          <h3>Campus Map with Live Density</h3>
+          <p>
+            An interactive campus map where every building is color-coded —
+            green, yellow, or red — based on predicted busyness right now.
+          </p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🔮</div>
+          <h3>Crowd Predictor Engine</h3>
+          <p>
+            Pulls CPP's public class schedule data to calculate how many
+            students are in each building at any given time — no sensors needed.
+          </p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🚪</div>
+          <h3>Classroom Availability</h3>
+          <p>
+            See which rooms in any building are free right now. Perfect for
+            finding a quiet study spot between classes.
+          </p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🧭</div>
+          <h3>Smart Route Suggestions</h3>
+          <p>
+            Pick a destination and get a route that avoids the most crowded
+            paths — not just the shortest path.
+          </p>
+        </div>
+      </div>
+
+      <!-- DEMO VISUALIZATION -->
+      <div class="occ-section">
+        <div class="section-label">Live Preview · What Students Would See</div>
+
+        <div class="building-row">
+          <div class="bldg-name">Engineering Building (3)</div>
+          <div class="bldg-time">Now · 10:00 AM</div>
+          <div class="density-bar-wrap">
+            <div class="density-bar bar-high"></div>
+          </div>
+          <div class="status-text high">BUSY</div>
+          <div class="dot high"></div>
+        </div>
+
+        <div class="building-row">
+          <div class="bldg-name">University Library</div>
+          <div class="bldg-time">Now · 10:00 AM</div>
+          <div class="density-bar-wrap">
+            <div class="density-bar bar-med"></div>
+          </div>
+          <div class="status-text med">MOD</div>
+          <div class="dot med"></div>
+        </div>
+
+        <div class="building-row">
+          <div class="bldg-name">College of Business (163)</div>
+          <div class="bldg-time">Now · 10:00 AM</div>
+          <div class="density-bar-wrap">
+            <div class="density-bar bar-low"></div>
+          </div>
+          <div class="status-text low">OPEN</div>
+          <div class="dot low"></div>
+        </div>
+
+        <div class="building-row">
+          <div class="bldg-name">Science Laboratory (8)</div>
+          <div class="bldg-time">Now · 10:00 AM</div>
+          <div class="density-bar-wrap">
+            <div class="density-bar bar-high"></div>
+          </div>
+          <div class="status-text high">BUSY</div>
+          <div class="dot high"></div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- SPRINT PLAN -->
+      <div class="section-label">Development Plan · 9 Weeks · 2 Sprints</div>
+      <div class="timeline">
+        <div class="sprint-card">
+          <div class="sprint-num">Sprint 1 · Weeks 1–4</div>
+          <h3>Foundation & Data Engine</h3>
+          <ul>
+            <li>Set up React Native + Expo project</li>
+            <li>Build CPP schedule scraper in Python</li>
+            <li>Design & seed Neon (Postgres) database</li>
+            <li>Build Express API for predictions</li>
+            <li>Campus map view with busyness markers</li>
+            <li>Classroom availability screen</li>
+          </ul>
+        </div>
+        <div class="sprint-card">
+          <div class="sprint-num">Sprint 2 · Weeks 5–8</div>
+          <h3>UX, Routes & Polish</h3>
+          <ul>
+            <li>Route recommendation feature</li>
+            <li>"Right now" time-aware dashboard</li>
+            <li>UI/UX polish + real device testing</li>
+            <li>Edge case handling & bug fixes</li>
+            <li>Deliverables: test cases, design docs</li>
+            <li>Demo prep & release notes</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- TECH STACK -->
+      <div class="section-label">Tech Stack</div>
+      <div class="stack-grid">
+        <span class="tag highlight">React Native</span>
+        <span class="tag highlight">Expo SDK</span>
+        <span class="tag">NativeWind v4</span>
+        <span class="tag highlight">Node.js + Express</span>
+        <span class="tag">Neon (Postgres)</span>
+        <span class="tag">Drizzle ORM</span>
+        <span class="tag">Python Scraper</span>
+        <span class="tag highlight">Google Maps SDK</span>
+        <span class="tag">schedule.cpp.edu</span>
+        <span class="tag">Claude AI</span>
+        <span class="tag">GitHub Copilot</span>
+      </div>
+
+      <!-- WHY THIS WORKS -->
+      <div class="section-label">Why This Project Wins</div>
+      <div class="feature-grid" style="margin-bottom: 40px">
+        <div class="feature-card">
+          <div class="feature-icon">✅</div>
+          <h3>Realistic in 9 Weeks</h3>
+          <p>
+            No sensors, no hardware, no live APIs. Just publicly available
+            schedule data + smart inference. Feasible for two developers.
+          </p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🏫</div>
+          <h3>Solves a Real CPP Problem</h3>
+          <p>
+            Directly replaces a weak existing tool. There's a real user, a real
+            pain point, and a real campus to demo on.
+          </p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🤖</div>
+          <h3>AI-Augmented Workflow</h3>
+          <p>
+            Claude, Copilot, and Gemini handle docs, code scaffolding, and
+            presentations — so the team stays focused on building.
+          </p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">📱</div>
+          <h3>Portfolio-Worthy Output</h3>
+          <p>
+            A real mobile app with a data pipeline, REST API, and ML-lite
+            predictor — impressive on any resume or GitHub.
+          </p>
+        </div>
+      </div>
+
+      <!-- CTA -->
+      <div class="cta-box">
+        <h2>Let's build it.</h2>
+        <p>
+          CPP already has a student-made scheduler that scraped the same data.
+          There's a clear precedent, a clear problem, and a clear path forward.
+          This is the project worth building.
+        </p>
+      </div>
+    </div>
+  </body>
+</html>
