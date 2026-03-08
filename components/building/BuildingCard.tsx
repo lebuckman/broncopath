@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Pressable, View, Text } from 'react-native';
 import { Colors } from '../../constants/colors';
 import { Fonts } from '../../constants/fonts';
@@ -37,15 +38,18 @@ export default function BuildingCard({
   onPress,
 }: Props) {
   const color = densityColor(level);
+  const [pressed, setPressed] = useState(false);
 
   return (
     <Pressable
       onPress={onPress}
-      className="rounded-2xl p-4 border"
-      style={({ pressed }) => ({
+      onPressIn={() => setPressed(true)}
+      onPressOut={() => setPressed(false)}
+      className="rounded-2xl p-5 border"
+      style={{
         backgroundColor: pressed ? Colors.cardHover : Colors.card,
         borderColor: Colors.border,
-      })}
+      }}
     >
       {/* Row 1: building name + occupancy percentage */}
       <View className="flex-row justify-between items-center mb-1">

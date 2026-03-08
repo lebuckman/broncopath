@@ -30,7 +30,7 @@ export default function NowPill({ updatedAt }: Props) {
 
   return (
     <View
-      className="flex-row items-center self-start px-3 py-1.5 rounded-full border mb-4"
+      className="flex-row items-center self-start px-4 py-2 rounded-full border mb-6"
       style={{ backgroundColor: Colors.accentBg, borderColor: Colors.accentBorder }}
     >
       <Animated.View

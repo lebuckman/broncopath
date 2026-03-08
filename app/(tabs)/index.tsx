@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { ScrollView, View, Text, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -17,12 +18,14 @@ function getGreeting(): string {
 
 export default function HomeScreen() {
   const router = useRouter();
+  const [roomPressed, setRoomPressed] = useState(false);
+  const [routePressed, setRoutePressed] = useState(false);
 
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: Colors.bg }}>
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 32 }}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 24, paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}
       >
         {/* Greeting */}
@@ -33,7 +36,7 @@ export default function HomeScreen() {
           {getGreeting()}, Bronco 👋
         </Text>
         <Text
-          className="text-[26px] mb-4"
+          className="text-[26px] mb-6"
           style={{ color: Colors.text, fontFamily: Fonts.display }}
         >
           What's happening now
@@ -44,7 +47,7 @@ export default function HomeScreen() {
 
         {/* Campus Overview */}
         <SectionLabel>Campus Overview</SectionLabel>
-        <View className="gap-2.5 mb-6">
+        <View className="gap-2.5 mb-10">
           {BUILDINGS.map(b => (
             <BuildingCard
               key={b.id}
@@ -63,12 +66,14 @@ export default function HomeScreen() {
         <SectionLabel>Quick Actions</SectionLabel>
         <View className="flex-row gap-2.5">
           <Pressable
-            className="flex-1 rounded-xl p-4 border"
-            style={({ pressed }) => ({
-              backgroundColor: pressed ? Colors.cardHover : Colors.accentBg,
-              borderColor: Colors.accentBorder,
-            })}
+            className="flex-1 rounded-xl p-5 border"
             onPress={() => router.push('/(tabs)/rooms')}
+            onPressIn={() => setRoomPressed(true)}
+            onPressOut={() => setRoomPressed(false)}
+            style={{
+              backgroundColor: roomPressed ? Colors.cardHover : Colors.accentBg,
+              borderColor: Colors.accentBorder,
+            }}
           >
             <Text className="text-2xl mb-2">🚪</Text>
             <Text
@@ -86,12 +91,14 @@ export default function HomeScreen() {
           </Pressable>
 
           <Pressable
-            className="flex-1 rounded-xl p-4 border"
-            style={({ pressed }) => ({
-              backgroundColor: pressed ? Colors.cardHover : Colors.card,
-              borderColor: Colors.border,
-            })}
+            className="flex-1 rounded-xl p-5 border"
             onPress={() => router.push('/(tabs)/route')}
+            onPressIn={() => setRoutePressed(true)}
+            onPressOut={() => setRoutePressed(false)}
+            style={{
+              backgroundColor: routePressed ? Colors.cardHover : Colors.card,
+              borderColor: Colors.border,
+            }}
           >
             <Text className="text-2xl mb-2">🧭</Text>
             <Text
