@@ -11,11 +11,11 @@ import ChipFilter from '../../components/ui/ChipFilter';
 const FILTER_OPTIONS = ['All', 'Free Now', 'Study Rooms', 'Labs'];
 
 function roomMatchesFilters(room: Room, filters: string[]): boolean {
-  return filters.some(f => {
+  return filters.every(f => {
     if (f === 'Free Now')    return room.status === 'free';
     if (f === 'Study Rooms') return room.type.includes('Study') || room.type === 'Quiet Zone' || room.type === 'Group Room';
     if (f === 'Labs')        return room.type.includes('Lab');
-    return false;
+    return true;
   });
 }
 
@@ -62,15 +62,32 @@ export default function RoomsScreen() {
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}
       >
-        {filteredBuildings.map(b => (
-          <BuildingAccordion
-            key={b.id}
-            name={b.name}
-            code={b.code}
-            freeCount={b.freeCount}
-            rooms={b.rooms}
-          />
-        ))}
+        {filteredBuildings.length === 0 && activeFilters.length > 0 ? (
+          <View className="items-center justify-center pt-16">
+            <Text
+              className="text-[15px] mb-1"
+              style={{ color: Colors.text, fontFamily: Fonts.bodyMedium }}
+            >
+              No rooms match
+            </Text>
+            <Text
+              className="text-[12px] text-center"
+              style={{ color: Colors.muted, fontFamily: Fonts.body }}
+            >
+              Try removing a filter
+            </Text>
+          </View>
+        ) : (
+          filteredBuildings.map(b => (
+            <BuildingAccordion
+              key={b.id}
+              name={b.name}
+              code={b.code}
+              freeCount={b.freeCount}
+              rooms={b.rooms}
+            />
+          ))
+        )}
       </ScrollView>
     </SafeAreaView>
   );
