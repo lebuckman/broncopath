@@ -50,8 +50,8 @@ export const BUILDINGS: Building[] = [
     level: 'high',
     roomCount: 5,
     freeCount: 2,
-    latitude: 34.0582,
-    longitude: -117.8218,
+    latitude: 34.05886,
+    longitude: -117.82222,
     updatedAt: '2026-03-08T09:00:00.000Z',
     rooms: [
       { id: '9-101', number: '9-101', type: 'Lecture Hall',  capacity: 120, status: 'busy' },
@@ -69,8 +69,8 @@ export const BUILDINGS: Building[] = [
     level: 'med',
     roomCount: 5,
     freeCount: 3,
-    latitude: 34.0569,
-    longitude: -117.8205,
+    latitude: 34.05750,
+    longitude: -117.82138,
     updatedAt: '2026-03-08T09:00:00.000Z',
     rooms: [
       { id: 'l-1',     number: 'L-1',     type: 'Main Floor',   capacity: 200, status: 'busy' },
@@ -88,8 +88,8 @@ export const BUILDINGS: Building[] = [
     level: 'low',
     roomCount: 5,
     freeCount: 4,
-    latitude: 34.0565,
-    longitude: -117.8195,
+    latitude: 34.06159,
+    longitude: -117.81964,
     updatedAt: '2026-03-08T09:00:00.000Z',
     rooms: [
       { id: '163-101', number: '163-101', type: 'Lecture Hall', capacity: 80,  status: 'free' },
@@ -107,8 +107,8 @@ export const BUILDINGS: Building[] = [
     level: 'high',
     roomCount: 5,
     freeCount: 2,
-    latitude: 34.0578,
-    longitude: -117.8200,
+    latitude: 34.05862,
+    longitude: -117.82485,
     updatedAt: '2026-03-08T09:00:00.000Z',
     rooms: [
       { id: '8-101', number: '8-101', type: 'Chem Lab',     capacity: 30,  status: 'busy' },

@@ -3,6 +3,7 @@ module.exports = {
     name: 'broncopath',
     slug: 'broncopath',
     scheme: 'broncopath',
+    newArchEnabled: false,
     version: '1.0.0',
     orientation: 'portrait',
     icon: './assets/icon.png',
@@ -15,9 +16,6 @@ module.exports = {
     ios: {
       supportsTablet: true,
       bundleIdentifier: 'com.anonymous.broncopath',
-      config: {
-        googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ?? '',
-      },
     },
     android: {
       adaptiveIcon: {
@@ -27,11 +25,7 @@ module.exports = {
         monochromeImage: './assets/android-icon-monochrome.png',
       },
       predictiveBackGestureEnabled: false,
-      config: {
-        googleMaps: {
-          apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ?? '',
-        },
-      },
+      package: 'com.anonymous.broncopath',
     },
     web: {
       favicon: './assets/favicon.png',

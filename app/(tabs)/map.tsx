@@ -1,13 +1,12 @@
 import { useState } from 'react';
 import { View, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import MapView, { PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView from 'react-native-maps';
 import { Colors } from '../../constants/colors';
 import { Fonts } from '../../constants/fonts';
 import { BUILDINGS } from '../../constants/mockData';
 import type { Building } from '../../constants/mockData';
 import { CPP_REGION } from '../../constants/campus';
-import { DARK_MAP_STYLE } from '../../constants/mapStyle';
 import BuildingMarker from '../../components/map/BuildingMarker';
 import MapLegend from '../../components/map/MapLegend';
 import BuildingDetailSheet from '../../components/building/BuildingDetailSheet';
@@ -15,6 +14,7 @@ import BuildingDetailSheet from '../../components/building/BuildingDetailSheet';
 export default function MapScreen() {
   const [selected, setSelected] = useState<Building | null>(null);
   const [sheetVisible, setSheetVisible] = useState(false);
+  const [mapHeight, setMapHeight] = useState(0);
 
   function handleMarkerPress(building: Building) {
     setSelected(building);
@@ -40,12 +40,10 @@ export default function MapScreen() {
       </View>
 
       {/* Map */}
-      <View style={{ flex: 1 }}>
+      <View style={{ flex: 1 }} onLayout={e => setMapHeight(e.nativeEvent.layout.height)}>
         <MapView
-          style={{ flex: 1 }}
-          provider={PROVIDER_GOOGLE}
+          style={{ width: '100%', height: mapHeight }}
           initialRegion={CPP_REGION}
-          customMapStyle={DARK_MAP_STYLE}
           showsUserLocation
           showsMyLocationButton={false}
           showsCompass={false}
