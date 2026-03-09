@@ -26,7 +26,11 @@ export default function NowPill({ updatedAt }: Props) {
   }, [opacity]);
 
   const mins = minutesAgo(updatedAt);
-  const timeLabel = mins <= 0 ? 'just now' : `${mins} min ago`;
+  const timeLabel =
+    mins <= 0          ? 'just now' :
+    mins < 60          ? `${mins} min ago` :
+    mins < 1440        ? `${Math.floor(mins / 60)} hr ago` :
+                         `${Math.floor(mins / 1440)} d ago`;
 
   return (
     <View
