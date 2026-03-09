@@ -35,7 +35,7 @@ No test runner or linter is configured yet.
 All screens use mock data from `constants/mockData.ts`. The mock shapes exactly match the API contracts in `docs/contexts/REQUIREMENTS.md`, so switching to the live backend only requires changing the data source, not the components.
 
 **Build order — current progress:**
-Steps 1–11 complete. Next is Step 12 (ChipFilter).
+All 14 steps complete. Sprint 1 done.
 - ✅ Step 1: NativeWind configured and verified
 - ✅ Step 2: Root `_layout.tsx` — fonts, dark bg, StatusBar, Expo Router entry
 - ✅ Step 3: Tab navigator — 4 tabs, Feather icons, active/inactive colors
@@ -47,9 +47,9 @@ Steps 1–11 complete. Next is Step 12 (ChipFilter).
 - ✅ Step 9: Rooms screen — `BuildingAccordion` with LayoutAnimation expand/collapse
 - ✅ Step 10: Route screen — `RouteInputCard`, `RouteOptionCard`, `CrowdTipCard`
 - ✅ Step 11: Map screen — Apple Maps MapView + `BuildingMarker` + `MapLegend` + `BuildingDetailSheet` on tap
-- ⬜ Step 12: `ChipFilter` wired to Map and Rooms screens
-- ⬜ Step 13: `lib/api.ts` — fetch wrapper pointed at mock/localhost
-- ⬜ Step 14: `useBuildings`, `useRooms`, `useRoutes` hooks
+- ✅ Step 12: `ChipFilter` wired to Map (OR logic) and Rooms (AND logic + empty state) screens
+- ✅ Step 13: `lib/api.ts` — fetch wrapper; mock returns today, uncomment fetch for live backend
+- ✅ Step 14: `useBuildings`, `useRooms`, `useRoutes` hooks — `useState`/`useEffect`, return `{ data, loading, error }`
 
 One commit per step. Do not skip ahead.
 
