@@ -35,15 +35,31 @@ No test runner or linter is configured yet.
 All screens use mock data from `constants/mockData.ts`. The mock shapes exactly match the API contracts in `docs/contexts/REQUIREMENTS.md`, so switching to the live backend only requires changing the data source, not the components.
 
 **Build order — current progress:**
-Steps 1–3 complete. Next is Step 4.
+Steps 1–11 complete. Next is Step 12 (ChipFilter).
 - ✅ Step 1: NativeWind configured and verified
 - ✅ Step 2: Root `_layout.tsx` — fonts, dark bg, StatusBar, Expo Router entry
 - ✅ Step 3: Tab navigator — 4 tabs, Feather icons, active/inactive colors
-- ⬜ Step 4: `constants/colors.ts` + `constants/mockData.ts`
-- ⬜ Step 5: Primitive UI components (DensityDot, DensityBar, RoomBadge, SectionLabel)
-- ⬜ Steps 6–14: see `docs/contexts/REQUIREMENTS.md` § Build Order
+- ✅ Step 4: `constants/colors.ts` + `constants/mockData.ts`
+- ✅ Step 5: `DensityDot`, `DensityBar`, `RoomBadge`, `SectionLabel` primitives
+- ✅ Step 6: `BuildingCard` component (`components/building/`)
+- ✅ Step 7: Home screen — greeting, NowPill, BuildingCard list, Quick Actions grid
+- ✅ Step 8: `BuildingDetailSheet` — slide-up modal with room list (wired to Home)
+- ✅ Step 9: Rooms screen — `BuildingAccordion` with LayoutAnimation expand/collapse
+- ✅ Step 10: Route screen — `RouteInputCard`, `RouteOptionCard`, `CrowdTipCard`
+- ✅ Step 11: Map screen — Apple Maps MapView + `BuildingMarker` + `MapLegend` + `BuildingDetailSheet` on tap
+- ⬜ Step 12: `ChipFilter` wired to Map and Rooms screens
+- ⬜ Step 13: `lib/api.ts` — fetch wrapper pointed at mock/localhost
+- ⬜ Step 14: `useBuildings`, `useRooms`, `useRoutes` hooks
 
 One commit per step. Do not skip ahead.
+
+**Known patterns:**
+- `Pressable` + NativeWind: use `useState` + `onPressIn`/`onPressOut` with a static `style` object — do NOT use the function-style `style={({ pressed }) => ...}` form, which NativeWind v4 silently drops.
+- `SafeAreaView` on tab screens: always pass `edges={['top']}` — the tab navigator already handles the bottom safe area, and omitting `edges` causes a double inset gap above the tab bar.
+- Dynamic colors (from `Colors.*`) and `fontFamily` go in the `style` prop; layout/spacing go in `className`. Never mix `StyleSheet.create` with `className` in the same component.
+- `MapView` (react-native-maps) requires explicit pixel dimensions — `flex: 1` alone does not propagate to native views reliably. Use `onLayout` on the container View to measure actual height, then pass `{ width: '100%', height: measuredHeight }` to MapView.
+- Map provider: using `PROVIDER_DEFAULT` (Apple Maps) — no API key needed. Dark mode is handled automatically by `userInterfaceStyle: 'dark'` in `app.config.js`. `customMapStyle` only works with `PROVIDER_GOOGLE` and is not used.
+- `app.config.js` replaces `app.json` for config (Expo prioritises it when both exist). Used for `react-native-maps` plugin declaration and any future env-var-driven config.
 
 ---
 
@@ -51,6 +67,7 @@ One commit per step. Do not skip ahead.
 
 | File | Purpose |
 |------|---------|
+| `app.config.js` | Expo app config — replaces `app.json`; declares `react-native-maps` plugin |
 | `babel.config.js` | `babel-preset-expo` with `jsxImportSource: 'nativewind'` + `nativewind/babel` preset |
 | `metro.config.js` | Wraps default Expo config with `withNativeWind({ input: './global.css' })` |
 | `tailwind.config.js` | Content paths for `app/`, `components/`, `App.tsx`; includes `nativewind/preset` |
@@ -73,9 +90,8 @@ docs: description
 
 ## Environment Variables
 
-`.env` is gitignored. Copy `.env.example` to `.env`.
+`.env` and `.env.local` are gitignored. Copy `.env.example` to `.env.local`.
 
 ```
 EXPO_PUBLIC_API_BASE_URL=http://localhost:3000
-EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=your_key_here
 ```

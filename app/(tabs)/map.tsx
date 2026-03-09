@@ -10,11 +10,26 @@ import { CPP_REGION } from '../../constants/campus';
 import BuildingMarker from '../../components/map/BuildingMarker';
 import MapLegend from '../../components/map/MapLegend';
 import BuildingDetailSheet from '../../components/building/BuildingDetailSheet';
+import ChipFilter from '../../components/ui/ChipFilter';
+
+const FILTER_OPTIONS = ['All', 'Quiet', 'Moderate', 'Busy'];
+
+function applyFilters(buildings: Building[], filters: string[]): Building[] {
+  if (filters.length === 0) return buildings;
+  return buildings.filter(b =>
+    (filters.includes('Quiet')    && b.level === 'low') ||
+    (filters.includes('Moderate') && b.level === 'med') ||
+    (filters.includes('Busy')     && b.level === 'high')
+  );
+}
 
 export default function MapScreen() {
   const [selected, setSelected] = useState<Building | null>(null);
   const [sheetVisible, setSheetVisible] = useState(false);
   const [mapHeight, setMapHeight] = useState(0);
+  const [activeFilters, setActiveFilters] = useState<string[]>([]);
+
+  const visibleBuildings = applyFilters(BUILDINGS, activeFilters);
 
   function handleMarkerPress(building: Building) {
     setSelected(building);
@@ -39,6 +54,12 @@ export default function MapScreen() {
         </Text>
       </View>
 
+      <ChipFilter
+        options={FILTER_OPTIONS}
+        active={activeFilters}
+        onChange={setActiveFilters}
+      />
+
       {/* Map */}
       <View style={{ flex: 1 }} onLayout={e => setMapHeight(e.nativeEvent.layout.height)}>
         <MapView
@@ -49,7 +70,7 @@ export default function MapScreen() {
           showsCompass={false}
           toolbarEnabled={false}
         >
-          {BUILDINGS.map(building => (
+          {visibleBuildings.map(building => (
             <BuildingMarker
               key={building.id}
               building={building}
