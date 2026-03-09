@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ScrollView, View, Text, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { Feather } from '@expo/vector-icons';
 import { Colors } from '../../constants/colors';
 import { Fonts } from '../../constants/fonts';
 import { BUILDINGS, type Building } from '../../constants/mockData';
@@ -35,7 +36,7 @@ export default function HomeScreen() {
           className="text-[12px] mb-1"
           style={{ color: Colors.muted, fontFamily: Fonts.body }}
         >
-          {getGreeting()}, Bronco 👋
+          {getGreeting()}, Bronco
         </Text>
         <Text
           className="text-[26px] mb-6"
@@ -77,7 +78,7 @@ export default function HomeScreen() {
               borderColor: Colors.accentBorder,
             }}
           >
-            <Text className="text-2xl mb-2">🚪</Text>
+            <Feather name="grid" size={20} color={Colors.accent} style={{ marginBottom: 8 }} />
             <Text
               className="text-sm mb-0.5"
               style={{ color: Colors.text, fontFamily: Fonts.bodyMedium }}
@@ -102,7 +103,7 @@ export default function HomeScreen() {
               borderColor: Colors.border,
             }}
           >
-            <Text className="text-2xl mb-2">🧭</Text>
+            <Feather name="map-pin" size={20} color={Colors.muted} style={{ marginBottom: 8 }} />
             <Text
               className="text-sm mb-0.5"
               style={{ color: Colors.text, fontFamily: Fonts.bodyMedium }}
