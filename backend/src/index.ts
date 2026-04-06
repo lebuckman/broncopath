@@ -1,6 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import { log } from 'console';
+import buildingsRouter from './buildings.js';
 
 const app = express();
 const PORT = process.env.PORT ?? 3000;
@@ -8,10 +8,12 @@ const PORT = process.env.PORT ?? 3000;
 app.use(cors());
 app.use(express.json());
 
-app.get('/api/health', (req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+app.get('/api/health', (_req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+app.use('/api/buildings', buildingsRouter);
+
 app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });
