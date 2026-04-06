@@ -1,5 +1,5 @@
-import { db } from './index.js';
-import { buildings, rooms } from './schema.js';
+import { db } from './index.ts';
+import { buildings, rooms } from './schema.ts';
 
 await db.insert(buildings).values([
     { id: 'eng-9',   name: 'Engineering Building', code: 'BLDG 9',   latitude: 34.05886, longitude: -117.82222 },
