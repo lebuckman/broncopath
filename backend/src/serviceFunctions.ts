@@ -4,19 +4,19 @@ import { rooms, scheduleEntries } from './db/schema.js';
 
 export type DensityLevel = 'low' | 'med' | 'high';
 
-function getCurrentDayOfWeek(): string | undefined {
+export function getCurrentDayOfWeek(): string  {
     const days = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
-    return days[new Date().getDay()];
+    return String(days[new Date().getDay()]);
 }
 
-function getCurrentTimeHHMM(): string {
+export function getCurrentTimeHHMM(): string {
     const now = new Date();
     const hh = String(now.getHours()).padStart(2, '0');
     const mm = String(now.getMinutes()).padStart(2, '0');
     return `${hh}:${mm}`;
 }
 
-function densityFromPercent(percent: number): DensityLevel {
+export function densityFromPercent(percent: number): DensityLevel {
     if (percent < 35) return 'low';
     if (percent < 70) return 'med';
     return 'high';

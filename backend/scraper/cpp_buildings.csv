@@ -1,0 +1,77 @@
+building_number,building_name,locator
+1,Building One,B-4
+2,College of Agriculture,C-2
+3,Science Laboratory,C-3
+4,Biotechnology Building,C-3
+4A,BioTrek Learning Center,C-2
+5,College of Education & Integrative Studies,"C-4,D-5,C-7"
+5,College of Letters, Arts & Social Sciences,C-4
+6,Classrooms (formerly CBA),C-5
+7,College of Environmental Design,C-2
+8,College of Science,C-4
+9,College of Engineering,C-5
+13,Art Department/Engineering Annex,D-6
+13,"LRC; ASI Tutoring; McNair Scholars",D-6
+15,Library,D-5
+17,Engineering Laboratories,B-6
+20,"Residence Hall, Encinitas",A-7
+21,"Residence Hall, Montecito",B-8
+22,"Residence Hall, Alamitos",B-9
+23,"Residence Hall, Aliso",A-9
+24,Music,D-4
+24A-F,Temporary Classrooms,E-4
+25,Drama Department / Theatre,E-4
+26,Union Plaza,E-6
+26A,Orientation Services,E-6
+29,W.K. Kellogg Arabian Horse Center,E-8
+32,Beef Unit/Feed Shed,D-1
+35,Bronco Student Center,E-5
+35A,W. Keith and Janet Kellogg University Art Gallery,E-5
+37,Swine Unit/Shelters,H-3
+38,Sheep/Wool Unit,H-3
+41,Darlene May Gymnasium,G-4
+43,Kellogg Gymnasium,G-5
+44,Swimming Pool,G-5
+45,Agricultural Engineering,E-12
+46,Health Services,C-2
+55,Foundation Administration Offices,F-6
+57,"Residence Hall, Palmitas",G-6
+58,"Residence Hall, Cedritos",A-7
+59,La Cienega Center (University Housing Services),B-6
+60,Residence Suites,G-6
+61,Residence Suites,G-6
+66,Bronco Bookstore,F-5
+67,Equine Research Facility,E-10
+70,Los Olivos Commons,A-7
+71,Recreation/Maintenance,B-10
+76,Kellogg West Education / Dining,D-3
+77,Kellogg West Main Lodge,D-2
+78,Kellogg West Addition,C-3
+79,Collins College of Hospitality Management,"E-2,E-3"
+79A,Collins College of Hospitality Management,"E-2,E-3"
+79B,Collins College of Hospitality Management,"E-2,E-3"
+80,Collins College of Hospitality Management,"E-2,E-3"
+86,English Language Institute,H-5
+89,Interim Design Center,E-12
+91,Student Affairs Information Technology Services,B-9
+92,Laboratory Facility,C-3
+94,University Office Building,B-5
+95,Cultural Centers,D-5
+97,Campus Center,D-4
+98,Classroom / Laboratory / Administration,C-7
+106,Parking Structure,D-8
+109,Police and Parking Services,D-10
+111,Manor House,B-5
+112,Kellogg House Pomona,A-6
+116,Child Care Center,F-6
+128,I Poly High School,H-4
+133,Parking Information Booth,E-7
+162,College of Business Administration,"B-7,B-8"
+163,College of Business Administration,"B-7,B-8"
+164,College of Business Administration,"B-7,B-8"
+200,University Village,See inset
+209,Lyle Center for Regenerative Studies,H-3
+211,Agriscapes and Farmstore,H-3
+220A,Center for Training, Technology and Incubation,See inset
+220B,Center for Training, Technology and Incubation,See inset
+220C,Center for Training, Technology and Incubation,See inset

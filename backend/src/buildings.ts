@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import { db } from './db/index.js';
-import { buildings, rooms } from './db/schema.js';
-import { eq } from 'drizzle-orm';
+import { buildings, rooms, scheduleEntries } from './db/schema.js';
+import * as fn from './serviceFunctions.js'
+import { eq, lte, gte, and } from 'drizzle-orm';
 
 const router = Router();
 
@@ -49,8 +50,8 @@ router.get('/:id/rooms', async (req, res) => {
       .from(rooms)
       .where(eq(rooms.buildingId, buildingId));
 
-    const dayOfWeek = getCurrentDayOfWeek();
-    const currentTime = getCurrentTimeHHMM();
+    const dayOfWeek = fn.getCurrentDayOfWeek();
+    const currentTime = fn.getCurrentTimeHHMM();
 
     const result = await Promise.all(
       buildingRooms.map(async (room) => {

@@ -1,0 +1,77 @@
+building_number,building_name,locator,locator_used,latitude,longitude,coord_source,needs_review
+1,Building One,B-4,B-4,34.0632062,-117.8148833,pdf_grid_estimate,no
+2,College of Agriculture,C-2,C-2,34.0607438,-117.81815,pdf_grid_estimate,no
+3,Science Laboratory,C-3,C-3,34.0607438,-117.8165167,pdf_grid_estimate,no
+4,Biotechnology Building,C-3,C-3,34.0607438,-117.8165167,pdf_grid_estimate,no
+4A,BioTrek Learning Center,C-2,C-2,34.0607438,-117.81815,pdf_grid_estimate,no
+5,College of Education & Integrative Studies,"C-4,D-5,C-7",C-4,34.0607438,-117.8148833,pdf_grid_estimate,yes
+5,College of Letters,Arts & Social Sciences,,,,unresolved,yes
+6,Classrooms (formerly CBA),C-5,C-5,34.0607438,-117.81325,pdf_grid_estimate,no
+7,College of Environmental Design,C-2,C-2,34.0607438,-117.81815,pdf_grid_estimate,no
+8,College of Science,C-4,C-4,34.0607438,-117.8148833,pdf_grid_estimate,no
+9,College of Engineering,C-5,C-5,34.0607438,-117.81325,pdf_grid_estimate,no
+13,Art Department/Engineering Annex,D-6,D-6,34.0582812,-117.8116167,pdf_grid_estimate,no
+13,LRC; ASI Tutoring; McNair Scholars,D-6,D-6,34.0582812,-117.8116167,pdf_grid_estimate,no
+15,Library,D-5,D-5,34.0582812,-117.81325,pdf_grid_estimate,no
+17,Engineering Laboratories,B-6,B-6,34.0632062,-117.8116167,pdf_grid_estimate,no
+20,"Residence Hall, Encinitas",A-7,A-7,34.0656688,-117.8099833,pdf_grid_estimate,no
+21,"Residence Hall, Montecito",B-8,B-8,34.0632062,-117.80835,pdf_grid_estimate,no
+22,"Residence Hall, Alamitos",B-9,B-9,34.0632062,-117.8067167,pdf_grid_estimate,no
+23,"Residence Hall, Aliso",A-9,A-9,34.0656688,-117.8067167,pdf_grid_estimate,no
+24,Music,D-4,D-4,34.0582812,-117.8148833,pdf_grid_estimate,no
+24A-F,Temporary Classrooms,E-4,E-4,34.0558188,-117.8148833,pdf_grid_estimate,no
+25,Drama Department / Theatre,E-4,E-4,34.0558188,-117.8148833,pdf_grid_estimate,no
+26,Union Plaza,E-6,E-6,34.0558188,-117.8116167,pdf_grid_estimate,no
+26A,Orientation Services,E-6,E-6,34.0558188,-117.8116167,pdf_grid_estimate,no
+29,W.K. Kellogg Arabian Horse Center,E-8,E-8,34.0558188,-117.80835,pdf_grid_estimate,no
+32,Beef Unit/Feed Shed,D-1,D-1,34.0582812,-117.8197833,pdf_grid_estimate,no
+35,Bronco Student Center,E-5,E-5,34.0558188,-117.81325,pdf_grid_estimate,no
+35A,W. Keith and Janet Kellogg University Art Gallery,E-5,E-5,34.0558188,-117.81325,pdf_grid_estimate,no
+37,Swine Unit/Shelters,H-3,H-3,34.0484312,-117.8165167,pdf_grid_estimate,no
+38,Sheep/Wool Unit,H-3,H-3,34.0484312,-117.8165167,pdf_grid_estimate,no
+41,Darlene May Gymnasium,G-4,G-4,34.0508938,-117.8148833,pdf_grid_estimate,no
+43,Kellogg Gymnasium,G-5,G-5,34.0508938,-117.81325,pdf_grid_estimate,no
+44,Swimming Pool,G-5,G-5,34.0508938,-117.81325,pdf_grid_estimate,no
+45,Agricultural Engineering,E-12,E-12,34.0558188,-117.8018167,pdf_grid_estimate,no
+46,Health Services,C-2,C-2,34.0607438,-117.81815,pdf_grid_estimate,no
+55,Foundation Administration Offices,F-6,F-6,34.0533562,-117.8116167,pdf_grid_estimate,no
+57,"Residence Hall, Palmitas",G-6,G-6,34.0508938,-117.8116167,pdf_grid_estimate,no
+58,"Residence Hall, Cedritos",A-7,A-7,34.0656688,-117.8099833,pdf_grid_estimate,no
+59,La Cienega Center (University Housing Services),B-6,B-6,34.0632062,-117.8116167,pdf_grid_estimate,no
+60,Residence Suites,G-6,G-6,34.0508938,-117.8116167,pdf_grid_estimate,no
+61,Residence Suites,G-6,G-6,34.0508938,-117.8116167,pdf_grid_estimate,no
+66,Bronco Bookstore,F-5,F-5,34.0533562,-117.81325,pdf_grid_estimate,no
+67,Equine Research Facility,E-10,E-10,34.0558188,-117.8050833,pdf_grid_estimate,no
+70,Los Olivos Commons,A-7,A-7,34.0656688,-117.8099833,pdf_grid_estimate,no
+71,Recreation/Maintenance,B-10,B-10,34.0632062,-117.8050833,pdf_grid_estimate,no
+76,Kellogg West Education / Dining,D-3,D-3,34.0582812,-117.8165167,pdf_grid_estimate,no
+77,Kellogg West Main Lodge,D-2,D-2,34.0582812,-117.81815,pdf_grid_estimate,no
+78,Kellogg West Addition,C-3,C-3,34.0607438,-117.8165167,pdf_grid_estimate,no
+79,Collins College of Hospitality Management,"E-2,E-3",E-2,34.0558188,-117.81815,pdf_grid_estimate,yes
+79A,Collins College of Hospitality Management,"E-2,E-3",E-2,34.0558188,-117.81815,pdf_grid_estimate,yes
+79B,Collins College of Hospitality Management,"E-2,E-3",E-2,34.0558188,-117.81815,pdf_grid_estimate,yes
+80,Collins College of Hospitality Management,"E-2,E-3",E-2,34.0558188,-117.81815,pdf_grid_estimate,yes
+86,English Language Institute,H-5,H-5,34.0484312,-117.81325,pdf_grid_estimate,no
+89,Interim Design Center,E-12,E-12,34.0558188,-117.8018167,pdf_grid_estimate,no
+91,Student Affairs Information Technology Services,B-9,B-9,34.0632062,-117.8067167,pdf_grid_estimate,no
+92,Laboratory Facility,C-3,C-3,34.0607438,-117.8165167,pdf_grid_estimate,no
+94,University Office Building,B-5,B-5,34.0632062,-117.81325,pdf_grid_estimate,no
+95,Cultural Centers,D-5,D-5,34.0582812,-117.81325,pdf_grid_estimate,no
+97,Campus Center,D-4,D-4,34.0582812,-117.8148833,pdf_grid_estimate,no
+98,Classroom / Laboratory / Administration,C-7,C-7,34.0607438,-117.8099833,pdf_grid_estimate,no
+106,Parking Structure,D-8,D-8,34.0582812,-117.80835,pdf_grid_estimate,no
+109,Police and Parking Services,D-10,D-10,34.0582812,-117.8050833,pdf_grid_estimate,no
+111,Manor House,B-5,B-5,34.0632062,-117.81325,pdf_grid_estimate,no
+112,Kellogg House Pomona,A-6,A-6,34.0656688,-117.8116167,pdf_grid_estimate,no
+116,Child Care Center,F-6,F-6,34.0533562,-117.8116167,pdf_grid_estimate,no
+128,I Poly High School,H-4,H-4,34.0484312,-117.8148833,pdf_grid_estimate,no
+133,Parking Information Booth,E-7,E-7,34.0558188,-117.8099833,pdf_grid_estimate,no
+162,College of Business Administration,"B-7,B-8",B-7,34.0632062,-117.8099833,pdf_grid_estimate,yes
+163,College of Business Administration,"B-7,B-8",B-7,34.0632062,-117.8099833,pdf_grid_estimate,yes
+164,College of Business Administration,"B-7,B-8",B-7,34.0632062,-117.8099833,pdf_grid_estimate,yes
+200,University Village,See inset,,,,unresolved,yes
+209,Lyle Center for Regenerative Studies,H-3,H-3,34.0484312,-117.8165167,pdf_grid_estimate,no
+211,Agriscapes and Farmstore,H-3,H-3,34.0484312,-117.8165167,pdf_grid_estimate,no
+220A,Center for Training,Technology and Incubation,,,,unresolved,yes
+220B,Center for Training,Technology and Incubation,,,,unresolved,yes
+220C,Center for Training,Technology and Incubation,,,,unresolved,yes
