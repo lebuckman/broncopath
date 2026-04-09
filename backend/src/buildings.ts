@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import { db } from './db/index.js';
-import { buildings, rooms, scheduleEntries } from './db/schema.js';
-import * as fn from './serviceFunctions.js'
-import { eq, lte, gte, and } from 'drizzle-orm';
+import { buildings, rooms } from './db/schema.js';
+import { eq } from 'drizzle-orm';
+import { getBuildingOccupancy, getRoomStatus } from './serviceFunctions.js';
 
 const router = Router();
 
@@ -12,12 +12,7 @@ router.get('/', async (_req, res) => {
 
     const result = await Promise.all(
       allBuildings.map(async (building) => {
-        const buildingRooms = await db
-          .select()
-          .from(rooms)
-          .where(eq(rooms.buildingId, building.id));
-
-        const roomCount = buildingRooms.length;
+        const { occupancy, level, roomCount, freeCount } = await getBuildingOccupancy(building.id);
 
         return {
           id: building.id,
@@ -25,10 +20,10 @@ router.get('/', async (_req, res) => {
           code: building.code,
           latitude: building.latitude,
           longitude: building.longitude,
-          occupancy: 42, // fake for now
-          level: 'med',
+          occupancy,
+          level,
           roomCount,
-          freeCount: Math.max(0, roomCount - 2), // fake-ish
+          freeCount,
           updatedAt: new Date().toISOString(),
         };
       })
@@ -50,33 +45,17 @@ router.get('/:id/rooms', async (req, res) => {
       .from(rooms)
       .where(eq(rooms.buildingId, buildingId));
 
-    const dayOfWeek = fn.getCurrentDayOfWeek();
-    const currentTime = fn.getCurrentTimeHHMM();
-
     const result = await Promise.all(
       buildingRooms.map(async (room) => {
-        const active = await db
-          .select()
-          .from(scheduleEntries)
-          .where(
-            and(
-              eq(scheduleEntries.roomId, room.id),
-              eq(scheduleEntries.dayOfWeek, dayOfWeek),
-              lte(scheduleEntries.startTime, currentTime),
-              gte(scheduleEntries.endTime, currentTime)
-            )
-          );
-
-        const currentClass = active[0];
+        const { status, freesAt } = await getRoomStatus(room.id);
 
         return {
           id: room.id,
           number: room.number,
           type: room.type,
           capacity: room.capacity,
-          status: currentClass ? 'occupied' : 'free',
-          freesAt: currentClass ? currentClass.endTime : null,
-          courseName: currentClass?.courseName ?? null,
+          status,
+          ...(freesAt && { freesAt }),
         };
       })
     );
