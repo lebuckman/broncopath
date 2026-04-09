@@ -21,7 +21,7 @@ function getGreeting(): string {
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { buildings } = useBuildings();
+  const { buildings, loading, error } = useBuildings();
   const [roomPressed, setRoomPressed] = useState(false);
   const [routePressed, setRoutePressed] = useState(false);
   const [selectedBuilding, setSelectedBuilding] = useState<Building | null>(null);
@@ -52,20 +52,30 @@ export default function HomeScreen() {
 
         {/* Campus Overview */}
         <SectionLabel>Campus Overview</SectionLabel>
-        <View className="gap-2.5 mb-10">
-          {buildings.map(b => (
-            <BuildingCard
-              key={b.id}
-              name={b.name}
-              code={b.code}
-              percentage={b.occupancy}
-              level={b.level}
-              roomCount={b.roomCount}
-              freeCount={b.freeCount}
-              onPress={() => setSelectedBuilding(b)}
-            />
-          ))}
-        </View>
+        {loading ? (
+          <Text style={{ color: Colors.muted, fontFamily: Fonts.body }}>
+            Loading buildings...
+          </Text>
+        ) : error ? (
+          <Text style={{ color: Colors.muted, fontFamily: Fonts.body }}>
+            Failed to load buildings.
+          </Text>
+        ) : (
+          <View className="gap-2.5 mb-10">
+            {buildings.map(b => (
+              <BuildingCard
+                key={b.id}
+                name={b.name}
+                code={b.code}
+                percentage={b.occupancy}
+                level={b.level}
+                roomCount={b.roomCount}
+                freeCount={b.freeCount}
+                onPress={() => setSelectedBuilding(b)}
+              />
+            ))}
+          </View>
+        )}
 
         {/* Quick Actions */}
         <SectionLabel>Quick Actions</SectionLabel>

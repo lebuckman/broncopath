@@ -21,7 +21,7 @@ function roomMatchesFilters(room: Room, filters: string[]): boolean {
 }
 
 export default function RoomsScreen() {
-  const { buildings } = useBuildings();
+  const { buildings, loading, error } = useBuildings();
   const [roomsMap, setRoomsMap] = useState<Record<string, Room[]>>({});
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
 
@@ -69,38 +69,48 @@ export default function RoomsScreen() {
         onChange={setActiveFilters}
       />
 
-      <ScrollView
-        className="flex-1"
-        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}
-        showsVerticalScrollIndicator={false}
-      >
-        {filteredBuildings.length === 0 && activeFilters.length > 0 ? (
-          <View className="items-center justify-center pt-16">
-            <Text
-              className="text-[15px] mb-1"
-              style={{ color: Colors.text, fontFamily: Fonts.bodyMedium }}
-            >
-              No rooms match
-            </Text>
-            <Text
-              className="text-[12px] text-center"
-              style={{ color: Colors.muted, fontFamily: Fonts.body }}
-            >
-              Try removing a filter
-            </Text>
-          </View>
-        ) : (
-          filteredBuildings.map(b => (
-            <BuildingAccordion
-              key={b.id}
-              name={b.name}
-              code={b.code}
-              freeCount={b.freeCount}
-              rooms={b.rooms}
-            />
-          ))
-        )}
-      </ScrollView>
+      {loading ? (
+        <Text style={{ color: Colors.muted, fontFamily: Fonts.body }}>
+          Loading rooms...
+        </Text>
+      ) : error ? (
+        <Text style={{ color: Colors.muted, fontFamily: Fonts.body }}>
+          Failed to load rooms.
+        </Text>
+      ) : (
+        <ScrollView
+          className="flex-1"
+          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}
+          showsVerticalScrollIndicator={false}
+        >
+          {filteredBuildings.length === 0 && activeFilters.length > 0 ? (
+            <View className="items-center justify-center pt-16">
+              <Text
+                className="text-[15px] mb-1"
+                style={{ color: Colors.text, fontFamily: Fonts.bodyMedium }}
+              >
+                No rooms match
+              </Text>
+              <Text
+                className="text-[12px] text-center"
+                style={{ color: Colors.muted, fontFamily: Fonts.body }}
+              >
+                Try removing a filter
+              </Text>
+            </View>
+          ) : (
+            filteredBuildings.map(b => (
+              <BuildingAccordion
+                key={b.id}
+                name={b.name}
+                code={b.code}
+                freeCount={b.freeCount}
+                rooms={b.rooms}
+              />
+            ))
+          )}
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 }
