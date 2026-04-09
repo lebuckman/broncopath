@@ -17,7 +17,7 @@ SEMESTER_CODE = "2263"  # Spring Semester 2026
 KNOWN_BUILDING_COORDS: dict[str, dict[str, float]] = {
     "8": {"latitude": 34.05862, "longitude": -117.82485},
     "9": {"latitude": 34.05886, "longitude": -117.82222},
-    "15": {"latitude": 34.05750, "longitude": -117.82138},
+    "15": {"latitude": 34.05792, "longitude": -117.82134},
     "163": {"latitude": 34.06159, "longitude": -117.81964},
 }
 
