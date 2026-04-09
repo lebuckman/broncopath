@@ -3,6 +3,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../../constants/colors';
 import { Fonts } from '../../constants/fonts';
 import type { Building, Room } from '../../constants/mockData';
+import { useRooms } from '../../hooks/useRooms';
 import BottomSheet from '../ui/BottomSheet';
 import DensityDot from '../ui/DensityDot';
 import DensityBar from '../ui/DensityBar';
@@ -34,6 +35,7 @@ function densityColor(level: Building['level']): string {
 
 export default function BuildingDetailSheet({ building, visible, onClose }: Props) {
   const insets = useSafeAreaInsets();
+  const { rooms, loading: roomsLoading } = useRooms(building?.id ?? '');
 
   return (
     <BottomSheet visible={visible} onClose={onClose}>
@@ -81,15 +83,20 @@ export default function BuildingDetailSheet({ building, visible, onClose }: Prop
           {/* Room list */}
           <View className="px-5 pt-4">
             <SectionLabel>Rooms</SectionLabel>
+            {roomsLoading ? (
+              <Text className="text-[12px] py-4" style={{ color: Colors.muted, fontFamily: Fonts.body }}>
+                Loading rooms…
+              </Text>
+            ) : (
             <ScrollView
               style={{ maxHeight: 340 }}
               showsVerticalScrollIndicator={false}
             >
-              {building.rooms.map((room, i) => (
+              {rooms.map((room, i) => (
                 <View
                   key={room.id}
                   className="flex-row items-center justify-between py-3"
-                  style={i < building.rooms.length - 1
+                  style={i < rooms.length - 1
                     ? { borderBottomColor: Colors.border, borderBottomWidth: 1 }
                     : undefined
                   }
@@ -115,6 +122,7 @@ export default function BuildingDetailSheet({ building, visible, onClose }: Prop
                 </View>
               ))}
             </ScrollView>
+            )}
           </View>
         </View>
       )}

@@ -23,7 +23,7 @@ export interface Building {
   latitude: number;
   longitude: number;
   updatedAt: string;
-  rooms: Room[];
+  rooms?: Room[];
 }
 
 export interface RouteStep {

@@ -4,8 +4,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import MapView from 'react-native-maps';
 import { Colors } from '../../constants/colors';
 import { Fonts } from '../../constants/fonts';
-import { BUILDINGS } from '../../constants/mockData';
 import type { Building } from '../../constants/mockData';
+import { useBuildings } from '../../hooks/useBuildings';
 import { CPP_REGION } from '../../constants/campus';
 import BuildingMarker from '../../components/map/BuildingMarker';
 import MapLegend from '../../components/map/MapLegend';
@@ -24,12 +24,13 @@ function applyFilters(buildings: Building[], filters: string[]): Building[] {
 }
 
 export default function MapScreen() {
+  const { buildings } = useBuildings();
   const [selected, setSelected] = useState<Building | null>(null);
   const [sheetVisible, setSheetVisible] = useState(false);
   const [mapHeight, setMapHeight] = useState(0);
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
 
-  const visibleBuildings = applyFilters(BUILDINGS, activeFilters);
+  const visibleBuildings = applyFilters(buildings, activeFilters);
 
   function handleMarkerPress(building: Building) {
     setSelected(building);

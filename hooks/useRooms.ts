@@ -8,6 +8,11 @@ export function useRooms(buildingId: string) {
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
+    if (!buildingId) {
+      setRooms([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     getRooms(buildingId)

@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ScrollView, View, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors } from '../../constants/colors';
 import { Fonts } from '../../constants/fonts';
-import { BUILDINGS } from '../../constants/mockData';
 import type { Room } from '../../constants/mockData';
+import { useBuildings } from '../../hooks/useBuildings';
+import { getRooms } from '../../lib/api';
 import BuildingAccordion from '../../components/building/BuildingAccordion';
 import ChipFilter from '../../components/ui/ChipFilter';
 
@@ -20,18 +21,29 @@ function roomMatchesFilters(room: Room, filters: string[]): boolean {
 }
 
 export default function RoomsScreen() {
+  const { buildings } = useBuildings();
+  const [roomsMap, setRoomsMap] = useState<Record<string, Room[]>>({});
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
 
-  const filteredBuildings = BUILDINGS
-    .map(b => {
-      const rooms = activeFilters.length === 0
-        ? b.rooms
-        : b.rooms.filter(r => roomMatchesFilters(r, activeFilters));
-      return { ...b, rooms, freeCount: rooms.filter(r => r.status === 'free').length };
-    })
-    .filter(b => b.rooms.length > 0);
+  useEffect(() => {
+    buildings.forEach(b => {
+      getRooms(b.id).then(rooms => {
+        setRoomsMap(prev => ({ ...prev, [b.id]: rooms }));
+      });
+    });
+  }, [buildings]);
 
-  const totalFree = filteredBuildings.reduce((sum, b) => sum + b.freeCount, 0);
+  const filteredBuildings = buildings
+    .map(b => {
+      const allRooms = roomsMap[b.id] ?? [];
+      const rooms = activeFilters.length === 0
+        ? allRooms
+        : allRooms.filter((r: Room) => roomMatchesFilters(r, activeFilters));
+      return { ...b, rooms, freeCount: rooms.filter((r: Room) => r.status === 'free').length };
+    })
+    .filter(b => activeFilters.length === 0 || !roomsMap[b.id] || b.rooms.length > 0);
+
+  const totalFree = filteredBuildings.reduce((sum: number, b) => sum + b.freeCount, 0);
 
   return (
     <SafeAreaView edges={['top']} className="flex-1" style={{ backgroundColor: Colors.bg }}>

@@ -5,7 +5,8 @@ import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { Colors } from '../../constants/colors';
 import { Fonts } from '../../constants/fonts';
-import { BUILDINGS, type Building } from '../../constants/mockData';
+import type { Building } from '../../constants/mockData';
+import { useBuildings } from '../../hooks/useBuildings';
 import BuildingCard from '../../components/building/BuildingCard';
 import BuildingDetailSheet from '../../components/building/BuildingDetailSheet';
 import SectionLabel from '../../components/ui/SectionLabel';
@@ -20,6 +21,7 @@ function getGreeting(): string {
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { buildings } = useBuildings();
   const [roomPressed, setRoomPressed] = useState(false);
   const [routePressed, setRoutePressed] = useState(false);
   const [selectedBuilding, setSelectedBuilding] = useState<Building | null>(null);
@@ -46,12 +48,12 @@ export default function HomeScreen() {
         </Text>
 
         {/* Live indicator */}
-        <NowPill updatedAt={BUILDINGS[0].updatedAt} />
+        <NowPill updatedAt={buildings[0]?.updatedAt ?? new Date().toISOString()} />
 
         {/* Campus Overview */}
         <SectionLabel>Campus Overview</SectionLabel>
         <View className="gap-2.5 mb-10">
-          {BUILDINGS.map(b => (
+          {buildings.map(b => (
             <BuildingCard
               key={b.id}
               name={b.name}

@@ -21,7 +21,7 @@
     "typescript": "^6.0.2"
   },
   "scripts": {
-    "dev": "nodemon --exec ts-node src/index.ts",
+    "dev": "npx tsx --watch src/index.ts",
     "build": "tsc",
     "db:push": "drizzle-kit push",
     "db:seed": "ts-node src/db/seed.ts"
