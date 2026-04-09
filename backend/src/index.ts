@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
-import buildingsRouter from './buildings.js';
+import 'dotenv/config';
+import buildingsRouter from './buildings.ts';
 
 const app = express();
 const PORT = process.env.PORT ?? 3000;

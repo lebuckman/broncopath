@@ -1,8 +1,8 @@
 import { Router } from 'express';
-import { db } from './db/index.js';
-import { buildings, rooms } from './db/schema.js';
+import { db } from './db/index.ts';
+import { buildings, rooms } from './db/schema.ts';
 import { eq } from 'drizzle-orm';
-import { getBuildingOccupancy, getRoomStatus } from './serviceFunctions.js';
+import { getBuildingOccupancy, getRoomStatus } from './serviceFunctions.ts';
 
 const router = Router();
 

@@ -1,6 +1,6 @@
 import { and, eq, lte, gte } from 'drizzle-orm';
-import { db } from './db/index.js';
-import { rooms, scheduleEntries } from './db/schema.js';
+import { db } from './db/index.ts';
+import { rooms, scheduleEntries } from './db/schema.ts';
 
 export type DensityLevel = 'low' | 'med' | 'high';
 
