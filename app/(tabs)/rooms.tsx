@@ -7,6 +7,7 @@ import type { Room } from "../../constants/mockData";
 import { useBuildings } from "../../hooks/useBuildings";
 import { getRooms } from "../../lib/api";
 import BuildingAccordion from "../../components/building/BuildingAccordion";
+import BuildingAccordionSkeleton from "../../components/building/BuildingAccordionSkeleton";
 import ChipFilter from "../../components/ui/ChipFilter";
 
 const FILTER_OPTIONS = ["All", "Free Now", "Study Rooms", "Labs"];
@@ -90,14 +91,9 @@ export default function RoomsScreen() {
       />
 
       {loading ? (
-        <View className="flex-1 items-center justify-center">
-          <Text
-            className="text-[13px]"
-            style={{ color: Colors.muted, fontFamily: Fonts.body }}
-          >
-            Loading rooms…
-          </Text>
-        </View>
+        <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}>
+          {[...Array(8)].map((_, i) => <BuildingAccordionSkeleton key={i} />)}
+        </ScrollView>
       ) : error ? (
         <View className="flex-1 items-center justify-center">
           <Text

@@ -8,6 +8,7 @@ import { Fonts } from "../../constants/fonts";
 import type { Building } from "../../constants/mockData";
 import { useBuildings } from "../../hooks/useBuildings";
 import BuildingCard from "../../components/building/BuildingCard";
+import BuildingCardSkeleton from "../../components/building/BuildingCardSkeleton";
 import BuildingDetailSheet from "../../components/building/BuildingDetailSheet";
 import SectionLabel from "../../components/ui/SectionLabel";
 import NowPill from "../../components/ui/NowPill";
@@ -65,14 +66,12 @@ export default function HomeScreen() {
         {/* Campus Overview */}
         <SectionLabel>Quietest Right Now</SectionLabel>
         {loading ? (
-          <View className="items-center justify-center py-10 mb-8">
-            <Text
-              className="text-[13px]"
-              style={{ color: Colors.muted, fontFamily: Fonts.body }}
-            >
-              Loading buildings…
-            </Text>
-          </View>
+          <>
+            <View className="gap-2.5 mb-3">
+              {[...Array(4)].map((_, i) => <BuildingCardSkeleton key={i} />)}
+            </View>
+            <View style={{ height: 32, marginBottom: 32 }} />
+          </>
         ) : error ? (
           <View className="items-center justify-center py-10 mb-8">
             <Text
