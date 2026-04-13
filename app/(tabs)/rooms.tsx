@@ -1,21 +1,26 @@
-import { useState, useEffect } from 'react';
-import { ScrollView, View, Text } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Colors } from '../../constants/colors';
-import { Fonts } from '../../constants/fonts';
-import type { Room } from '../../constants/mockData';
-import { useBuildings } from '../../hooks/useBuildings';
-import { getRooms } from '../../lib/api';
-import BuildingAccordion from '../../components/building/BuildingAccordion';
-import ChipFilter from '../../components/ui/ChipFilter';
+import { useState, useEffect } from "react";
+import { ScrollView, View, Text } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Colors } from "../../constants/colors";
+import { Fonts } from "../../constants/fonts";
+import type { Room } from "../../constants/mockData";
+import { useBuildings } from "../../hooks/useBuildings";
+import { getRooms } from "../../lib/api";
+import BuildingAccordion from "../../components/building/BuildingAccordion";
+import ChipFilter from "../../components/ui/ChipFilter";
 
-const FILTER_OPTIONS = ['All', 'Free Now', 'Study Rooms', 'Labs'];
+const FILTER_OPTIONS = ["All", "Free Now", "Study Rooms", "Labs"];
 
 function roomMatchesFilters(room: Room, filters: string[]): boolean {
-  return filters.every(f => {
-    if (f === 'Free Now')    return room.status === 'free';
-    if (f === 'Study Rooms') return room.type.includes('Study') || room.type === 'Quiet Zone' || room.type === 'Group Room';
-    if (f === 'Labs')        return room.type.includes('Lab');
+  return filters.every((f) => {
+    if (f === "Free Now") return room.status === "free";
+    if (f === "Study Rooms")
+      return (
+        room.type.includes("Study") ||
+        room.type === "Quiet Zone" ||
+        room.type === "Group Room"
+      );
+    if (f === "Labs") return room.type.includes("Lab");
     return true;
   });
 }
@@ -26,27 +31,42 @@ export default function RoomsScreen() {
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
 
   useEffect(() => {
-    buildings.forEach(b => {
-      getRooms(b.id).then(rooms => {
-        setRoomsMap(prev => ({ ...prev, [b.id]: rooms }));
+    buildings.forEach((b) => {
+      getRooms(b.id).then((rooms) => {
+        setRoomsMap((prev) => ({ ...prev, [b.id]: rooms }));
       });
     });
   }, [buildings]);
 
   const filteredBuildings = buildings
-    .map(b => {
+    .map((b) => {
       const allRooms = roomsMap[b.id] ?? [];
-      const rooms = activeFilters.length === 0
-        ? allRooms
-        : allRooms.filter((r: Room) => roomMatchesFilters(r, activeFilters));
-      return { ...b, rooms, freeCount: rooms.filter((r: Room) => r.status === 'free').length };
+      const rooms =
+        activeFilters.length === 0
+          ? allRooms
+          : allRooms.filter((r: Room) => roomMatchesFilters(r, activeFilters));
+      return {
+        ...b,
+        rooms,
+        freeCount: rooms.filter((r: Room) => r.status === "free").length,
+      };
     })
-    .filter(b => activeFilters.length === 0 || !roomsMap[b.id] || b.rooms.length > 0);
+    .filter(
+      (b) =>
+        activeFilters.length === 0 || !roomsMap[b.id] || b.rooms.length > 0,
+    );
 
-  const totalFree = filteredBuildings.reduce((sum: number, b) => sum + b.freeCount, 0);
+  const totalFree = filteredBuildings.reduce(
+    (sum: number, b) => sum + b.freeCount,
+    0,
+  );
 
   return (
-    <SafeAreaView edges={['top']} className="flex-1" style={{ backgroundColor: Colors.bg }}>
+    <SafeAreaView
+      edges={["top"]}
+      className="flex-1"
+      style={{ backgroundColor: Colors.bg }}
+    >
       {/* Header */}
       <View className="px-5 pt-6 pb-4">
         <Text
@@ -70,13 +90,29 @@ export default function RoomsScreen() {
       />
 
       {loading ? (
-        <Text style={{ color: Colors.muted, fontFamily: Fonts.body }}>
-          Loading rooms...
-        </Text>
+        <View className="flex-1 items-center justify-center">
+          <Text
+            className="text-[13px]"
+            style={{ color: Colors.muted, fontFamily: Fonts.body }}
+          >
+            Loading rooms…
+          </Text>
+        </View>
       ) : error ? (
-        <Text style={{ color: Colors.muted, fontFamily: Fonts.body }}>
-          Failed to load rooms.
-        </Text>
+        <View className="flex-1 items-center justify-center">
+          <Text
+            className="text-[13px] mb-1"
+            style={{ color: Colors.text, fontFamily: Fonts.bodyMedium }}
+          >
+            Couldn't load rooms
+          </Text>
+          <Text
+            className="text-[12px]"
+            style={{ color: Colors.muted, fontFamily: Fonts.body }}
+          >
+            Check your connection and try again
+          </Text>
+        </View>
       ) : (
         <ScrollView
           className="flex-1"
@@ -99,7 +135,7 @@ export default function RoomsScreen() {
               </Text>
             </View>
           ) : (
-            filteredBuildings.map(b => (
+            filteredBuildings.map((b) => (
               <BuildingAccordion
                 key={b.id}
                 name={b.name}
