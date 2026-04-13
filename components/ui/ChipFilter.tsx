@@ -23,8 +23,8 @@ export default function ChipFilter({ options, active, onChange }: Props) {
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
-      style={{ flexGrow: 0 }}
-      contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 16, gap: 8 }}
+      style={{ height: 52, marginBottom: 16 }}
+      contentContainerStyle={{ paddingHorizontal: 20, gap: 8, alignItems: 'center' }}
     >
       {options.map((option, i) => {
         const isActive = i === 0 ? active.length === 0 : active.includes(option);
@@ -32,7 +32,7 @@ export default function ChipFilter({ options, active, onChange }: Props) {
           <Pressable
             key={option}
             onPress={() => handlePress(option)}
-            className="px-4 py-2 border rounded-full"
+            className="px-4 py-3 border rounded-full"
             style={{
               backgroundColor: isActive ? Colors.accentBg : Colors.card,
               borderColor: isActive ? Colors.accentBorder : Colors.border,
