@@ -139,11 +139,13 @@ export default function RoomsScreen() {
           />
         </View>
 
-        <ChipFilter
-          options={FILTER_OPTIONS}
-          active={activeFilters}
-          onChange={setActiveFilters}
-        />
+        <View className="mb-4 mt-2">
+          <ChipFilter
+            options={FILTER_OPTIONS}
+            active={activeFilters}
+            onChange={setActiveFilters}
+          />
+        </View>
 
         {loading ? (
           <ScrollView
