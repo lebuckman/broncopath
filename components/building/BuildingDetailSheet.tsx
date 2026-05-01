@@ -9,6 +9,7 @@ import BottomSheet from "../ui/BottomSheet";
 import DensityDot from "../ui/DensityDot";
 import DensityBar from "../ui/DensityBar";
 import RoomBadge from "../ui/RoomBadge";
+import CountdownTimer from "../ui/CountdownTimer";
 import SectionLabel from "../ui/SectionLabel";
 
 interface Props {
@@ -159,6 +160,10 @@ export default function BuildingDetailSheet({
                           />
                         </Pressable>
                       )}
+                      {room.freesAt &&
+                        (room.status === "busy" || room.status === "soon") && (
+                          <CountdownTimer freesAt={room.freesAt} />
+                        )}
                       <RoomBadge
                         status={room.status}
                         label={

@@ -13,6 +13,7 @@ import { Colors } from "../../constants/colors";
 import { Fonts } from "../../constants/fonts";
 import type { Room } from "../../constants/mockData";
 import RoomBadge from "../ui/RoomBadge";
+import CountdownTimer from "../ui/CountdownTimer";
 
 if (
   Platform.OS === "android" &&
@@ -135,6 +136,10 @@ export default function BuildingAccordion({
                     <Feather name="share-2" size={14} color={Colors.accent} />
                   </Pressable>
                 )}
+                {room.freesAt &&
+                  (room.status === "busy" || room.status === "soon") && (
+                    <CountdownTimer freesAt={room.freesAt} />
+                  )}
                 <RoomBadge
                   status={room.status}
                   label={
