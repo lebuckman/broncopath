@@ -1,3 +1,4 @@
+import csv
 import os
 import random
 import re
@@ -47,7 +48,8 @@ def clean(text: str) -> str:
 
 def parse_building_room(raw_building_room: str) -> tuple[str, str]:
     raw_building_room = clean(raw_building_room)
-    m = re.match(r"^Bldg\s+(.+?)\s+Rm\s+(.+)$", raw_building_room, re.IGNORECASE)
+    m = re.match(r"^Bldg\s+(.+?)\s+Rm\s+(.+)$",
+                 raw_building_room, re.IGNORECASE)
     if not m:
         return "", ""
     return m.group(1).strip(), m.group(2).strip()
@@ -161,7 +163,18 @@ def random_campus_coords(seed_text: str) -> tuple[float, float]:
     return round(lat, 6), round(lng, 6)
 
 
-def build_building_rows(building_numbers: set[str]) -> tuple[list[dict], list[str]]:
+def load_building_names() -> dict[str, str]:
+    csv_path = os.path.join(os.path.dirname(__file__), "cpp_buildings.csv")
+    names: dict[str, str] = {}
+    with open(csv_path, newline="", encoding="utf-8") as f:
+        for row in csv.DictReader(f):
+            num = row["building_number"].strip()
+            if num not in names:  # keep first entry when a number has multiple rows
+                names[num] = row["building_name"].strip()
+    return names
+
+
+def build_building_rows(building_numbers: set[str], building_names: dict[str, str]) -> tuple[list[dict], list[str]]:
     rows: list[dict] = []
     randomized: list[str] = []
 
@@ -176,7 +189,7 @@ def build_building_rows(building_numbers: set[str]) -> tuple[list[dict], list[st
 
         rows.append({
             "id": b,
-            "name": f"Building {b}",
+            "name": building_names.get(b, f"Building {b}"),
             "code": f"BLDG {b}",
             "latitude": lat,
             "longitude": lng,
@@ -220,7 +233,9 @@ def main() -> None:
     scraped_buildings = collect_all_scraped_buildings(SUBJECTS)
     print(f"\nTotal unique scraped buildings: {len(scraped_buildings)}")
 
-    building_rows, randomized = build_building_rows(scraped_buildings)
+    building_names = load_building_names()
+    building_rows, randomized = build_building_rows(
+        scraped_buildings, building_names)
 
     if not building_rows:
         print("No building rows found.")
