@@ -1,12 +1,23 @@
-import { useState } from 'react';
-import { LayoutAnimation, Platform, UIManager, Pressable, View, Text } from 'react-native';
-import { Feather } from '@expo/vector-icons';
-import { Colors } from '../../constants/colors';
-import { Fonts } from '../../constants/fonts';
-import type { Room } from '../../constants/mockData';
-import RoomBadge from '../ui/RoomBadge';
+import { useState } from "react";
+import {
+  LayoutAnimation,
+  Platform,
+  UIManager,
+  Pressable,
+  Share,
+  View,
+  Text,
+} from "react-native";
+import { Feather } from "@expo/vector-icons";
+import { Colors } from "../../constants/colors";
+import { Fonts } from "../../constants/fonts";
+import type { Room } from "../../constants/mockData";
+import RoomBadge from "../ui/RoomBadge";
 
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+if (
+  Platform.OS === "android" &&
+  UIManager.setLayoutAnimationEnabledExperimental
+) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
@@ -17,12 +28,27 @@ interface Props {
   rooms: Room[];
 }
 
-export default function BuildingAccordion({ name, code, freeCount, rooms }: Props) {
+export default function BuildingAccordion({
+  name,
+  code,
+  freeCount,
+  rooms,
+}: Props) {
   const [expanded, setExpanded] = useState(false);
+
+  async function handleShare(room: Room) {
+    try {
+      await Share.share({
+        message: `📍 Room ${room.number} is free right now!\nBuilding: ${name}\nCapacity: ${room.capacity} seats\nStatus: Free\n—\nSent via BroncoPath 🐴`,
+      });
+    } catch {
+      // user dismissed the share sheet — nothing to do
+    }
+  }
 
   function toggle() {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setExpanded(prev => !prev);
+    setExpanded((prev) => !prev);
   }
 
   return (
@@ -31,7 +57,10 @@ export default function BuildingAccordion({ name, code, freeCount, rooms }: Prop
       style={{ backgroundColor: Colors.card, borderColor: Colors.border }}
     >
       {/* Header */}
-      <Pressable className="flex-row items-center justify-between p-5" onPress={toggle}>
+      <Pressable
+        className="flex-row items-center justify-between p-5"
+        onPress={toggle}
+      >
         <View className="flex-1 mr-3">
           <Text
             className="text-sm mb-0.5"
@@ -59,18 +88,32 @@ export default function BuildingAccordion({ name, code, freeCount, rooms }: Prop
               </Text>
             </View>
           )}
-          <Feather name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={Colors.muted} />
+          <Feather
+            name={expanded ? "chevron-up" : "chevron-down"}
+            size={16}
+            color={Colors.muted}
+          />
         </View>
       </Pressable>
 
       {/* Room rows */}
       {expanded && (
-        <View style={{ borderTopColor: Colors.border, borderTopWidth: 1, backgroundColor: Colors.surface }}>
+        <View
+          style={{
+            borderTopColor: Colors.border,
+            borderTopWidth: 1,
+            backgroundColor: Colors.surface,
+          }}
+        >
           {rooms.map((room, i) => (
             <View
               key={room.id}
               className="flex-row items-center justify-between px-5 py-3"
-              style={i < rooms.length - 1 ? { borderBottomColor: Colors.border, borderBottomWidth: 1 } : undefined}
+              style={
+                i < rooms.length - 1
+                  ? { borderBottomColor: Colors.border, borderBottomWidth: 1 }
+                  : undefined
+              }
             >
               <View className="flex-1 mr-3">
                 <Text
@@ -86,10 +129,21 @@ export default function BuildingAccordion({ name, code, freeCount, rooms }: Prop
                   {room.type} · {room.capacity} seats
                 </Text>
               </View>
-              <RoomBadge
-                status={room.status}
-                label={room.status === 'soon' && room.freesAt ? `Frees at ${room.freesAt}` : undefined}
-              />
+              <View className="flex-row items-center gap-2">
+                {room.status === "free" && (
+                  <Pressable onPress={() => handleShare(room)} hitSlop={8}>
+                    <Feather name="share-2" size={14} color={Colors.accent} />
+                  </Pressable>
+                )}
+                <RoomBadge
+                  status={room.status}
+                  label={
+                    room.status === "soon" && room.freesAt
+                      ? `Frees at ${room.freesAt}`
+                      : undefined
+                  }
+                />
+              </View>
             </View>
           ))}
         </View>
