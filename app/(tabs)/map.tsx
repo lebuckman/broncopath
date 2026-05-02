@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { View, Text } from "react-native";
+import { View, Text, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import MapView from "react-native-maps";
 import { Colors } from "../../constants/colors";
@@ -25,7 +25,7 @@ function applyFilters(buildings: Building[], filters: string[]): Building[] {
 }
 
 export default function MapScreen() {
-  const { buildings } = useBuildings();
+  const { buildings, loading } = useBuildings();
   const [selected, setSelected] = useState<Building | null>(null);
   const [sheetVisible, setSheetVisible] = useState(false);
   const [mapHeight, setMapHeight] = useState(0);
@@ -73,24 +73,49 @@ export default function MapScreen() {
         style={{ flex: 1 }}
         onLayout={(e) => setMapHeight(e.nativeEvent.layout.height)}
       >
-        <MapView
-          style={{ width: "100%", height: mapHeight }}
-          initialRegion={CPP_REGION}
-          showsUserLocation
-          showsMyLocationButton={false}
-          showsCompass={false}
-          toolbarEnabled={false}
-        >
-          {visibleBuildings.map((building) => (
-            <BuildingMarker
-              key={building.id}
-              building={building}
-              onPress={handleMarkerPress}
-            />
-          ))}
-        </MapView>
+        {loading ? (
+          <View
+            style={{
+              flex: 1,
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: Colors.bg,
+            }}
+          >
+            <ActivityIndicator size="large" color={Colors.accent} />
+            <Text
+              style={{
+                color: Colors.muted,
+                fontFamily: Fonts.body,
+                fontSize: 13,
+                marginTop: 12,
+              }}
+            >
+              Loading map…
+            </Text>
+          </View>
+        ) : (
+          <>
+            <MapView
+              style={{ width: "100%", height: mapHeight }}
+              initialRegion={CPP_REGION}
+              showsUserLocation
+              showsMyLocationButton={false}
+              showsCompass={false}
+              toolbarEnabled={false}
+            >
+              {visibleBuildings.map((building) => (
+                <BuildingMarker
+                  key={building.id}
+                  building={building}
+                  onPress={handleMarkerPress}
+                />
+              ))}
+            </MapView>
 
-        <MapLegend />
+            <MapLegend />
+          </>
+        )}
       </View>
 
       <BuildingDetailSheet
