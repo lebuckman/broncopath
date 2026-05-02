@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useLocalSearchParams } from "expo-router";
 import {
   ScrollView,
   View,
@@ -27,6 +28,7 @@ import ChipFilter from "../../components/ui/ChipFilter";
 type SearchMode = "buildings" | "rooms";
 
 export default function RoomsScreen() {
+  const { collapseAll } = useLocalSearchParams<{ collapseAll?: string }>();
   const { buildings, loading, error } = useBuildings();
   const [roomsMap, setRoomsMap] = useState<Record<string, Room[]>>({});
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
@@ -338,7 +340,7 @@ export default function RoomsScreen() {
             ) : (
               filteredBuildings.map((b) => (
                 <BuildingAccordion
-                  key={b.id}
+                  key={b.id + (collapseAll ?? "")}
                   name={b.name}
                   code={b.code}
                   freeCount={b.freeCount}
