@@ -1,4 +1,4 @@
-import { and, eq, lte, gte } from "drizzle-orm";
+import { and, eq, lte, gte, gt } from "drizzle-orm";
 import { db } from "./db/index.ts";
 import { rooms, scheduleEntries } from "./db/schema.ts";
 
@@ -62,7 +62,26 @@ export async function getRoomStatus(roomId: string) {
 
   const currentClass = active[0];
 
-  if (!currentClass) return { status: "free" as const };
+  if (!currentClass) {
+    const upcoming = await db
+      .select()
+      .from(scheduleEntries)
+      .where(
+        and(
+          eq(scheduleEntries.roomId, roomId),
+          eq(scheduleEntries.dayOfWeek, dayOfWeek),
+          gt(scheduleEntries.startTime, currentTime),
+        ),
+      )
+      .orderBy(scheduleEntries.startTime)
+      .limit(1);
+
+    const nextClass = upcoming[0];
+    return {
+      status: "free" as const,
+      ...(nextClass && { freeUntil: to12Hour(nextClass.startTime) }),
+    };
+  }
 
   if (currentClass.endTime <= soonThreshold) {
     return { status: "soon" as const, freesAt: to12Hour(currentClass.endTime) };

@@ -10,6 +10,7 @@ export interface Room {
   capacity: number;
   status: 'free' | 'busy' | 'soon';
   freesAt?: string;
+  freeUntil?: string;
 }
 
 export interface Building {

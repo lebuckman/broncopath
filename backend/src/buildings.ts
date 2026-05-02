@@ -47,7 +47,7 @@ router.get('/:id/rooms', async (req, res) => {
 
     const result = await Promise.all(
       buildingRooms.map(async (room) => {
-        const { status, freesAt } = await getRoomStatus(room.id);
+        const { status, freesAt, freeUntil } = await getRoomStatus(room.id);
 
         return {
           id: room.id,
@@ -56,6 +56,7 @@ router.get('/:id/rooms', async (req, res) => {
           capacity: room.capacity,
           status,
           ...(freesAt && { freesAt }),
+          ...(freeUntil && { freeUntil }),
         };
       })
     );
