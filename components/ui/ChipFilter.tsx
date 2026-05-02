@@ -29,6 +29,7 @@ export default function ChipFilter({ options, active, onChange }: Props) {
       {options.map((option, i) => {
         const isActive =
           i === 0 ? active.length === 0 : active.includes(option);
+        const label = i === 0 && active.length > 0 ? "x" : option;
         return (
           <Pressable
             key={option}
@@ -46,7 +47,7 @@ export default function ChipFilter({ options, active, onChange }: Props) {
                 fontFamily: Fonts.bodySemiBold,
               }}
             >
-              {option}
+              {label}
             </Text>
           </Pressable>
         );

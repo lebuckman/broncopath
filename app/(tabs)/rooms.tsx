@@ -6,6 +6,7 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
@@ -14,31 +15,24 @@ import { Fonts } from "../../constants/fonts";
 import type { Room } from "../../constants/mockData";
 import { useBuildings } from "../../hooks/useBuildings";
 import { getRooms } from "../../lib/api";
+import {
+  FILTER_OPTIONS,
+  applyRoomFilters,
+  type FilterMode,
+} from "../../lib/roomFilters";
 import BuildingAccordion from "../../components/building/BuildingAccordion";
 import BuildingAccordionSkeleton from "../../components/building/BuildingAccordionSkeleton";
 import ChipFilter from "../../components/ui/ChipFilter";
 
-const FILTER_OPTIONS = ["All", "Free Now", "Study Rooms", "Labs"];
-
-function roomMatchesFilters(room: Room, filters: string[]): boolean {
-  return filters.every((f) => {
-    if (f === "Free Now") return room.status === "free";
-    if (f === "Study Rooms")
-      return (
-        room.type.includes("Study") ||
-        room.type === "Quiet Zone" ||
-        room.type === "Group Room"
-      );
-    if (f === "Labs") return room.type.includes("Lab");
-    return true;
-  });
-}
+type SearchMode = "buildings" | "rooms";
 
 export default function RoomsScreen() {
   const { buildings, loading, error } = useBuildings();
   const [roomsMap, setRoomsMap] = useState<Record<string, Room[]>>({});
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
+  const [filterMode, setFilterMode] = useState<FilterMode>("any");
   const [query, setQuery] = useState("");
+  const [searchMode, setSearchMode] = useState<SearchMode>("buildings");
 
   useEffect(() => {
     buildings.forEach((b) => {
@@ -53,22 +47,28 @@ export default function RoomsScreen() {
   const filteredBuildings = buildings
     .map((b) => {
       const allRooms = roomsMap[b.id] ?? [];
-      const buildingMatches =
-        trimmed === "" ||
-        b.name.toLowerCase().includes(trimmed) ||
-        b.code.toLowerCase().includes(trimmed);
+
+      const chipFiltered =
+        activeFilters.length === 0
+          ? allRooms
+          : allRooms.filter((r) =>
+              applyRoomFilters(r, activeFilters, filterMode),
+            );
 
       let rooms: Room[];
-      if (trimmed !== "" && !buildingMatches) {
-        // Search mode: show only rooms whose number matches
-        rooms = allRooms.filter((r) =>
-          r.number.toLowerCase().includes(trimmed),
-        );
+      if (trimmed === "") {
+        rooms = chipFiltered;
+      } else if (searchMode === "buildings") {
+        const buildingMatches =
+          b.name.toLowerCase().includes(trimmed) ||
+          b.code.toLowerCase().includes(trimmed);
+        rooms = buildingMatches ? chipFiltered : [];
       } else {
-        rooms =
-          activeFilters.length === 0
-            ? allRooms
-            : allRooms.filter((r) => roomMatchesFilters(r, activeFilters));
+        rooms = chipFiltered.filter(
+          (r) =>
+            r.number.toLowerCase().includes(trimmed) ||
+            r.type.toLowerCase().includes(trimmed),
+        );
       }
 
       return {
@@ -77,22 +77,10 @@ export default function RoomsScreen() {
         freeCount: rooms.filter((r: Room) => r.status === "free").length,
       };
     })
-    .filter((b) => {
-      if (trimmed !== "")
-        return (
-          b.rooms.length > 0 ||
-          b.name.toLowerCase().includes(trimmed) ||
-          b.code.toLowerCase().includes(trimmed)
-        );
-      return (
-        activeFilters.length === 0 || !roomsMap[b.id] || b.rooms.length > 0
-      );
-    });
+    .filter((b) => b.rooms.length > 0);
 
-  const totalFree = filteredBuildings.reduce(
-    (sum: number, b) => sum + b.freeCount,
-    0,
-  );
+  const totalRooms = filteredBuildings.reduce((s, b) => s + b.rooms.length, 0);
+  const totalBuildings = filteredBuildings.length;
 
   return (
     <SafeAreaView
@@ -116,20 +104,26 @@ export default function RoomsScreen() {
             className="text-[12px] mt-1"
             style={{ color: Colors.muted, fontFamily: Fonts.body }}
           >
-            {totalFree} rooms available right now
+            {loading
+              ? "Loading rooms…"
+              : `${totalRooms} room${totalRooms !== 1 ? "s" : ""} across ${totalBuildings} building${totalBuildings !== 1 ? "s" : ""}`}
           </Text>
         </View>
 
-        {/* Search bar */}
+        {/* Search bar with inline mode toggle */}
         <View
-          className="mx-5 mb-2 flex-row items-center rounded-xl border px-3"
+          className="mx-5 flex-row items-center rounded-xl border px-3"
           style={{ backgroundColor: Colors.card, borderColor: Colors.border }}
         >
           <Feather name="search" size={14} color={Colors.muted} />
           <TextInput
             className="flex-1 py-2.5 pl-2 text-[13px]"
             style={{ color: Colors.text, fontFamily: Fonts.body }}
-            placeholder="Search buildings or rooms…"
+            placeholder={
+              searchMode === "buildings"
+                ? "Search buildings…"
+                : "Search rooms by number or type…"
+            }
             placeholderTextColor={Colors.muted}
             value={query}
             onChangeText={setQuery}
@@ -137,14 +131,137 @@ export default function RoomsScreen() {
             autoCapitalize="none"
             clearButtonMode="while-editing"
           />
+          <View
+            style={{
+              flexDirection: "row",
+              backgroundColor: Colors.surface,
+              borderRadius: 6,
+              overflow: "hidden",
+              marginLeft: 6,
+            }}
+          >
+            <Pressable
+              onPress={() => setSearchMode("buildings")}
+              style={{
+                paddingHorizontal: 7,
+                paddingVertical: 4,
+                backgroundColor:
+                  searchMode === "buildings" ? Colors.accentBg : "transparent",
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 10,
+                  fontFamily: Fonts.bodyMedium,
+                  color:
+                    searchMode === "buildings" ? Colors.accent : Colors.muted,
+                }}
+              >
+                Bldg
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setSearchMode("rooms")}
+              style={{
+                paddingHorizontal: 7,
+                paddingVertical: 4,
+                backgroundColor:
+                  searchMode === "rooms" ? Colors.accentBg : "transparent",
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 10,
+                  fontFamily: Fonts.bodyMedium,
+                  color: searchMode === "rooms" ? Colors.accent : Colors.muted,
+                }}
+              >
+                Room
+              </Text>
+            </Pressable>
+          </View>
         </View>
 
-        <View className="mb-4 mt-2">
+        {/* Chip filter */}
+        <View className="my-3">
           <ChipFilter
             options={FILTER_OPTIONS}
             active={activeFilters}
             onChange={setActiveFilters}
           />
+        </View>
+
+        {/* Filter count + Any/All toggle — always visible */}
+        <View
+          style={{
+            height: 28,
+            flexDirection: "row",
+            justifyContent: "space-between",
+            alignItems: "center",
+            paddingHorizontal: 20,
+            marginBottom: 4,
+          }}
+        >
+          <Text
+            style={{
+              color: Colors.muted,
+              fontSize: 11,
+              fontFamily: Fonts.body,
+            }}
+          >
+            {activeFilters.length === 0
+              ? "No filters applied"
+              : activeFilters.length === 1
+                ? "1 Filter"
+                : `${activeFilters.length} Filters`}
+          </Text>
+          <View
+            style={{
+              flexDirection: "row",
+              backgroundColor: Colors.surface,
+              borderRadius: 6,
+              overflow: "hidden",
+            }}
+          >
+            <Pressable
+              onPress={() => setFilterMode("any")}
+              style={{
+                paddingHorizontal: 7,
+                paddingVertical: 4,
+                backgroundColor:
+                  filterMode === "any" ? Colors.accentBg : "transparent",
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 10,
+                  fontFamily: Fonts.bodyMedium,
+                  color: filterMode === "any" ? Colors.accent : Colors.muted,
+                }}
+              >
+                Any
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setFilterMode("all")}
+              style={{
+                paddingHorizontal: 7,
+                paddingVertical: 4,
+                backgroundColor:
+                  filterMode === "all" ? Colors.accentBg : "transparent",
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 10,
+                  fontFamily: Fonts.bodyMedium,
+                  color: filterMode === "all" ? Colors.accent : Colors.muted,
+                }}
+              >
+                All
+              </Text>
+            </Pressable>
+          </View>
         </View>
 
         {loading ? (
@@ -179,19 +296,31 @@ export default function RoomsScreen() {
           >
             {filteredBuildings.length === 0 ? (
               <View className="items-center justify-center pt-16">
+                <Feather
+                  name="inbox"
+                  size={32}
+                  color={Colors.muted}
+                  style={{ marginBottom: 12 }}
+                />
                 <Text
-                  className="text-[15px] mb-1"
-                  style={{ color: Colors.text, fontFamily: Fonts.bodyMedium }}
+                  style={{
+                    color: Colors.text,
+                    fontFamily: Fonts.bodyMedium,
+                    fontSize: 15,
+                    marginBottom: 4,
+                  }}
                 >
-                  No results
+                  No rooms match your filters
                 </Text>
                 <Text
-                  className="text-[12px] text-center"
-                  style={{ color: Colors.muted, fontFamily: Fonts.body }}
+                  style={{
+                    color: Colors.muted,
+                    fontFamily: Fonts.body,
+                    fontSize: 12,
+                    textAlign: "center",
+                  }}
                 >
-                  {trimmed !== ""
-                    ? "Try a different search"
-                    : "Try removing a filter"}
+                  Try adjusting your search or filters
                 </Text>
               </View>
             ) : (
@@ -202,6 +331,7 @@ export default function RoomsScreen() {
                   code={b.code}
                   freeCount={b.freeCount}
                   rooms={b.rooms}
+                  forceExpanded={searchMode === "rooms" && trimmed.length > 0}
                 />
               ))
             )}

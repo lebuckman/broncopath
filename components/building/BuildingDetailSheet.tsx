@@ -5,6 +5,7 @@ import { Colors } from "../../constants/colors";
 import { Fonts } from "../../constants/fonts";
 import type { Building, Room } from "../../constants/mockData";
 import { useRooms } from "../../hooks/useRooms";
+import { roomMatchesFilter } from "../../lib/roomFilters";
 import BottomSheet from "../ui/BottomSheet";
 import DensityDot from "../ui/DensityDot";
 import DensityBar from "../ui/DensityBar";
@@ -16,6 +17,7 @@ interface Props {
   building: Building | null;
   visible: boolean;
   onClose: () => void;
+  activeFilters?: string[];
 }
 
 function roomBadgeLabel(room: Room): string {
@@ -39,14 +41,23 @@ export default function BuildingDetailSheet({
   building,
   visible,
   onClose,
+  activeFilters,
 }: Props) {
   const insets = useSafeAreaInsets();
-  const { rooms, loading: roomsLoading } = useRooms(building?.id ?? "");
+  const { rooms: allRooms, loading: roomsLoading } = useRooms(
+    building?.id ?? "",
+  );
+  const rooms =
+    activeFilters && activeFilters.length > 0
+      ? allRooms.filter((r) =>
+          activeFilters.some((f) => roomMatchesFilter(r, f)),
+        )
+      : allRooms;
 
   async function handleShare(room: Room) {
     try {
       await Share.share({
-        message: `📍 Room ${room.number} is free right now!\nBuilding: ${building?.name}\nCapacity: ${room.capacity} seats\nStatus: Free\n—\nSent via BroncoPath 🐴`,
+        message: `📍 Room ${room.number} is free right now!\nBuilding: ${building?.name}\nCapacity: ${room.capacity > 0 ? `${room.capacity} seats` : "Unknown"}\nStatus: Free\n—\nSent via BroncoPath 🐴`,
       });
     } catch {
       // user dismissed the share sheet
@@ -144,7 +155,10 @@ export default function BuildingDetailSheet({
                         className="text-[11px]"
                         style={{ color: Colors.muted, fontFamily: Fonts.body }}
                       >
-                        {room.type} · {room.capacity} seats
+                        {room.type} ·{" "}
+                        {room.capacity > 0
+                          ? `${room.capacity} seats`
+                          : "Unknown seats"}
                       </Text>
                     </View>
                     <View className="flex-row items-center gap-2">

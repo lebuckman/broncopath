@@ -27,6 +27,7 @@ interface Props {
   code: string;
   freeCount: number;
   rooms: Room[];
+  forceExpanded?: boolean;
 }
 
 export default function BuildingAccordion({
@@ -34,13 +35,15 @@ export default function BuildingAccordion({
   code,
   freeCount,
   rooms,
+  forceExpanded,
 }: Props) {
   const [expanded, setExpanded] = useState(false);
+  const isExpanded = expanded || !!forceExpanded;
 
   async function handleShare(room: Room) {
     try {
       await Share.share({
-        message: `📍 Room ${room.number} is free right now!\nBuilding: ${name}\nCapacity: ${room.capacity} seats\nStatus: Free\n—\nSent via BroncoPath 🐴`,
+        message: `📍 Room ${room.number} is free right now!\nBuilding: ${name}\nCapacity: ${room.capacity > 0 ? `${room.capacity} seats` : "Unknown"}\nStatus: Free\n—\nSent via BroncoPath 🐴`,
       });
     } catch {
       // user dismissed the share sheet — nothing to do
@@ -90,7 +93,7 @@ export default function BuildingAccordion({
             </View>
           )}
           <Feather
-            name={expanded ? "chevron-up" : "chevron-down"}
+            name={isExpanded ? "chevron-up" : "chevron-down"}
             size={16}
             color={Colors.muted}
           />
@@ -98,7 +101,7 @@ export default function BuildingAccordion({
       </Pressable>
 
       {/* Room rows */}
-      {expanded && (
+      {isExpanded && (
         <View
           style={{
             borderTopColor: Colors.border,
@@ -127,7 +130,10 @@ export default function BuildingAccordion({
                   className="text-[11px]"
                   style={{ color: Colors.muted, fontFamily: Fonts.body }}
                 >
-                  {room.type} · {room.capacity} seats
+                  {room.type} ·{" "}
+                  {room.capacity > 0
+                    ? `${room.capacity} seats`
+                    : "Unknown seats"}
                 </Text>
               </View>
               <View className="flex-row items-center gap-2">
