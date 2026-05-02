@@ -47,12 +47,17 @@ export default function BuildingDetailSheet({
   const { rooms: allRooms, loading: roomsLoading } = useRooms(
     building?.id ?? "",
   );
-  const rooms =
+  const rooms = (
     activeFilters && activeFilters.length > 0
       ? allRooms.filter((r) =>
           activeFilters.some((f) => roomMatchesFilter(r, f)),
         )
-      : allRooms;
+      : allRooms
+  )
+    .slice()
+    .sort((a, b) =>
+      a.number.localeCompare(b.number, undefined, { numeric: true }),
+    );
 
   async function handleShare(room: Room) {
     try {

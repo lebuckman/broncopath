@@ -71,13 +71,25 @@ export default function RoomsScreen() {
         );
       }
 
+      const sortedRooms = rooms
+        .slice()
+        .sort((a, b) =>
+          a.number.localeCompare(b.number, undefined, { numeric: true }),
+        );
+
       return {
         ...b,
-        rooms,
-        freeCount: rooms.filter((r: Room) => r.status === "free").length,
+        rooms: sortedRooms,
+        freeCount: sortedRooms.filter((r: Room) => r.status === "free").length,
       };
     })
-    .filter((b) => b.rooms.length > 0);
+    .filter((b) => b.rooms.length > 0)
+    .sort((a, b) => {
+      const numA = parseInt(a.code.replace(/\D/g, ""), 10);
+      const numB = parseInt(b.code.replace(/\D/g, ""), 10);
+      if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+      return a.code.localeCompare(b.code);
+    });
 
   const totalRooms = filteredBuildings.reduce((s, b) => s + b.rooms.length, 0);
   const totalBuildings = filteredBuildings.length;
