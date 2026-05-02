@@ -1,37 +1,46 @@
-import { useState } from "react";
-import { View, Text, ActivityIndicator } from "react-native";
+import { useState, useEffect } from "react";
+import { View, Text, ActivityIndicator, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import MapView from "react-native-maps";
 import { Colors } from "../../constants/colors";
 import { Fonts } from "../../constants/fonts";
-import type { Building } from "../../constants/mockData";
+import type { Building, Room } from "../../constants/mockData";
 import { useBuildings } from "../../hooks/useBuildings";
+import { getRooms } from "../../lib/api";
+import {
+  FILTER_OPTIONS,
+  applyRoomFilters,
+  type FilterMode,
+} from "../../lib/roomFilters";
 import { CPP_REGION } from "../../constants/campus";
 import BuildingMarker from "../../components/map/BuildingMarker";
 import MapLegend from "../../components/map/MapLegend";
 import BuildingDetailSheet from "../../components/building/BuildingDetailSheet";
 import ChipFilter from "../../components/ui/ChipFilter";
 
-const FILTER_OPTIONS = ["All", "Quiet", "Moderate", "Busy"];
-
-function applyFilters(buildings: Building[], filters: string[]): Building[] {
-  if (filters.length === 0) return buildings;
-  return buildings.filter(
-    (b) =>
-      (filters.includes("Quiet") && b.level === "low") ||
-      (filters.includes("Moderate") && b.level === "med") ||
-      (filters.includes("Busy") && b.level === "high"),
-  );
-}
-
 export default function MapScreen() {
   const { buildings, loading } = useBuildings();
+  const [roomsMap, setRoomsMap] = useState<Record<string, Room[]>>({});
   const [selected, setSelected] = useState<Building | null>(null);
   const [sheetVisible, setSheetVisible] = useState(false);
   const [mapHeight, setMapHeight] = useState(0);
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
+  const [filterMode, setFilterMode] = useState<FilterMode>("any");
 
-  const visibleBuildings = applyFilters(buildings, activeFilters);
+  useEffect(() => {
+    buildings.forEach((b) => {
+      getRooms(b.id).then((rooms) => {
+        setRoomsMap((prev) => ({ ...prev, [b.id]: rooms }));
+      });
+    });
+  }, [buildings]);
+
+  const visibleBuildings = buildings.filter((b) => {
+    if (activeFilters.length === 0) return true;
+    const rooms = roomsMap[b.id];
+    if (!rooms) return true;
+    return rooms.some((r) => applyRoomFilters(r, activeFilters, filterMode));
+  });
 
   function handleMarkerPress(building: Building) {
     setSelected(building);
@@ -52,12 +61,68 @@ export default function MapScreen() {
         >
           Campus Map
         </Text>
-        <Text
-          className="text-[12px] mt-1"
-          style={{ color: Colors.muted, fontFamily: Fonts.body }}
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginTop: 4,
+          }}
         >
-          Tap any building to explore
-        </Text>
+          <Text
+            className="text-[12px]"
+            style={{ color: Colors.muted, fontFamily: Fonts.body }}
+          >
+            Tap any building to explore
+          </Text>
+          <View
+            style={{
+              flexDirection: "row",
+              backgroundColor: Colors.surface,
+              borderRadius: 6,
+              overflow: "hidden",
+            }}
+          >
+            <Pressable
+              onPress={() => setFilterMode("any")}
+              style={{
+                paddingHorizontal: 7,
+                paddingVertical: 4,
+                backgroundColor:
+                  filterMode === "any" ? Colors.accentBg : "transparent",
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 10,
+                  fontFamily: Fonts.bodyMedium,
+                  color: filterMode === "any" ? Colors.accent : Colors.muted,
+                }}
+              >
+                Any
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setFilterMode("all")}
+              style={{
+                paddingHorizontal: 7,
+                paddingVertical: 4,
+                backgroundColor:
+                  filterMode === "all" ? Colors.accentBg : "transparent",
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 10,
+                  fontFamily: Fonts.bodyMedium,
+                  color: filterMode === "all" ? Colors.accent : Colors.muted,
+                }}
+              >
+                All
+              </Text>
+            </Pressable>
+          </View>
+        </View>
       </View>
 
       <View className="mb-4">
@@ -122,6 +187,7 @@ export default function MapScreen() {
         building={selected}
         visible={sheetVisible}
         onClose={() => setSheetVisible(false)}
+        activeFilters={activeFilters}
       />
     </SafeAreaView>
   );
