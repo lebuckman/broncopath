@@ -5,10 +5,12 @@ import { Colors } from "../../constants/colors";
 import { Fonts } from "../../constants/fonts";
 import type { Building, Room } from "../../constants/mockData";
 import { useRooms } from "../../hooks/useRooms";
+import { useFavorites } from "../../hooks/useFavorites";
 import { roomMatchesFilter } from "../../lib/roomFilters";
 import BottomSheet from "../ui/BottomSheet";
 import DensityDot from "../ui/DensityDot";
 import DensityBar from "../ui/DensityBar";
+import FavoriteButton from "../ui/FavoriteButton";
 import RoomBadge from "../ui/RoomBadge";
 import CountdownTimer from "../ui/CountdownTimer";
 import SectionLabel from "../ui/SectionLabel";
@@ -18,6 +20,7 @@ interface Props {
   visible: boolean;
   onClose: () => void;
   activeFilters?: string[];
+  filterRoomIds?: string[];
 }
 
 function roomBadgeLabel(room: Room): string {
@@ -42,22 +45,38 @@ export default function BuildingDetailSheet({
   visible,
   onClose,
   activeFilters,
+  filterRoomIds,
 }: Props) {
   const insets = useSafeAreaInsets();
   const { rooms: allRooms, loading: roomsLoading } = useRooms(
     building?.id ?? "",
   );
-  const rooms = (
-    activeFilters && activeFilters.length > 0
-      ? allRooms.filter((r) =>
-          activeFilters.some((f) => roomMatchesFilter(r, f)),
-        )
-      : allRooms
-  )
-    .slice()
-    .sort((a, b) =>
-      a.number.localeCompare(b.number, undefined, { numeric: true }),
-    );
+  const { isFavorite, toggleFavorite, getFavoriteRoomIds } = useFavorites();
+  const favoriteRoomIds = building ? getFavoriteRoomIds(building.id) : [];
+
+  const rooms = (() => {
+    let base = allRooms;
+    if (filterRoomIds) {
+      // Home screen: show only the explicitly specified room IDs
+      base = base.filter((r) => filterRoomIds.includes(r.id));
+    } else if (activeFilters && activeFilters.length > 0) {
+      // Strip "Favorites" — the detail sheet always shows all rooms for context;
+      // favorites are surfaced by sorting rather than filtering
+      const chipFilters = activeFilters.filter((f) => f !== "Favorites");
+      if (chipFilters.length > 0) {
+        base = base.filter((r) =>
+          chipFilters.some((f) => roomMatchesFilter(r, f, favoriteRoomIds)),
+        );
+      }
+    }
+    // Favorites float to top, then alphabetical by room number
+    return base.slice().sort((a, b) => {
+      const aFav = isFavorite(a.id) ? 0 : 1;
+      const bFav = isFavorite(b.id) ? 0 : 1;
+      if (aFav !== bFav) return aFav - bFav;
+      return a.number.localeCompare(b.number, undefined, { numeric: true });
+    });
+  })();
 
   async function handleShare(room: Room) {
     try {
@@ -167,6 +186,10 @@ export default function BuildingDetailSheet({
                       </Text>
                     </View>
                     <View className="flex-row items-center gap-2">
+                      <FavoriteButton
+                        isFavorite={isFavorite(room.id)}
+                        onToggle={() => toggleFavorite(room.id, building.id)}
+                      />
                       {room.status === "free" && (
                         <Pressable
                           onPress={() => handleShare(room)}

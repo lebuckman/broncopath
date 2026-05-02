@@ -3,10 +3,12 @@ import { ScrollView, View, Text, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
+import { MaterialIcons } from "@expo/vector-icons";
 import { Colors } from "../../constants/colors";
 import { Fonts } from "../../constants/fonts";
 import type { Building } from "../../constants/mockData";
 import { useBuildings } from "../../hooks/useBuildings";
+import { useFavorites } from "../../hooks/useFavorites";
 import BuildingCard from "../../components/building/BuildingCard";
 import BuildingCardSkeleton from "../../components/building/BuildingCardSkeleton";
 import BuildingDetailSheet from "../../components/building/BuildingDetailSheet";
@@ -22,11 +24,15 @@ function getGreeting(): string {
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { buildings, loading, error } = useBuildings();
+  const { buildings, loading } = useBuildings();
+  const { favorites, favoriteBuildingIds } = useFavorites();
   const [roomPressed, setRoomPressed] = useState(false);
   const [routePressed, setRoutePressed] = useState(false);
-  const [selectedBuilding, setSelectedBuilding] = useState<Building | null>(
-    null,
+  const [favoriteSheetBuilding, setFavoriteSheetBuilding] =
+    useState<Building | null>(null);
+
+  const favoriteBuildings = buildings.filter((b) =>
+    favoriteBuildingIds.includes(b.id),
   );
 
   return (
@@ -63,63 +69,74 @@ export default function HomeScreen() {
           updatedAt={buildings[0]?.updatedAt ?? new Date().toISOString()}
         />
 
-        {/* Campus Overview */}
-        <SectionLabel>Quietest Right Now</SectionLabel>
+        {/* Favorites */}
+        <SectionLabel>Your Favorites</SectionLabel>
         {loading ? (
-          <>
-            <View className="gap-2.5 mb-3">
-              {[...Array(4)].map((_, i) => <BuildingCardSkeleton key={i} />)}
-            </View>
-            <View style={{ height: 32, marginBottom: 32 }} />
-          </>
-        ) : error ? (
-          <View className="items-center justify-center py-10 mb-8">
+          <View className="gap-2.5 mb-8">
+            {[...Array(2)].map((_, i) => (
+              <BuildingCardSkeleton key={i} />
+            ))}
+          </View>
+        ) : favorites.length === 0 ? (
+          <View className="items-center justify-center py-16 mb-8">
+            <MaterialIcons
+              name="star-outline"
+              size={36}
+              color={Colors.muted}
+              style={{ marginBottom: 12 }}
+            />
             <Text
-              className="text-[13px] mb-1"
-              style={{ color: Colors.text, fontFamily: Fonts.bodyMedium }}
+              style={{
+                color: Colors.text,
+                fontFamily: Fonts.bodyMedium,
+                fontSize: 15,
+                marginBottom: 4,
+              }}
             >
-              Couldn't load buildings
+              No favorites yet
             </Text>
             <Text
-              className="text-[12px]"
-              style={{ color: Colors.muted, fontFamily: Fonts.body }}
+              style={{
+                color: Colors.muted,
+                fontFamily: Fonts.body,
+                fontSize: 12,
+                textAlign: "center",
+              }}
             >
-              Check your connection and try again
+              Tap the ★ next to any room in the{"\n"}Rooms or Map tab to save it
+              here.
             </Text>
           </View>
         ) : (
-          <>
-            <View className="gap-2.5 mb-3">
-              {[...buildings]
-                .filter((b) => b.roomCount >= 8)
-                .sort((a, b) => a.occupancy - b.occupancy)
-                .slice(0, 4)
-                .map((b) => (
-                  <BuildingCard
-                    key={b.id}
-                    name={b.name}
-                    code={b.code}
-                    percentage={b.occupancy}
-                    level={b.level}
-                    roomCount={b.roomCount}
-                    freeCount={b.freeCount}
-                    onPress={() => setSelectedBuilding(b)}
-                  />
-                ))}
-            </View>
-            <Pressable
-              className="flex-row items-center justify-end mb-8 py-2"
-              onPress={() => router.push("/(tabs)/rooms")}
+          <View className="gap-2.5 mb-6">
+            {favoriteBuildings.map((b) => (
+              <BuildingCard
+                key={b.id}
+                name={b.name}
+                code={b.code}
+                percentage={b.occupancy}
+                level={b.level}
+                roomCount={b.roomCount}
+                freeCount={b.freeCount}
+                onPress={() => setFavoriteSheetBuilding(b)}
+              />
+            ))}
+          </View>
+        )}
+
+        {favorites.length > 0 && (
+          <Pressable
+            className="flex-row items-center justify-end mb-8"
+            onPress={() => router.push("/(tabs)/rooms")}
+          >
+            <Text
+              className="text-[12px] mr-1"
+              style={{ color: Colors.accent, fontFamily: Fonts.bodySemiBold }}
             >
-              <Text
-                className="text-[12px] mr-1"
-                style={{ color: Colors.accent, fontFamily: Fonts.bodySemiBold }}
-              >
-                See all buildings
-              </Text>
-              <Feather name="arrow-right" size={12} color={Colors.accent} />
-            </Pressable>
-          </>
+              See all buildings
+            </Text>
+            <Feather name="arrow-right" size={12} color={Colors.accent} />
+          </Pressable>
         )}
 
         {/* Quick Actions */}
@@ -188,9 +205,9 @@ export default function HomeScreen() {
       </ScrollView>
 
       <BuildingDetailSheet
-        building={selectedBuilding}
-        visible={selectedBuilding !== null}
-        onClose={() => setSelectedBuilding(null)}
+        building={favoriteSheetBuilding}
+        visible={favoriteSheetBuilding !== null}
+        onClose={() => setFavoriteSheetBuilding(null)}
       />
     </SafeAreaView>
   );

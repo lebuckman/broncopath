@@ -26,7 +26,12 @@ function parseTimeMs(time12: string): number | null {
   return d.getTime();
 }
 
-export function roomMatchesFilter(room: Room, filter: string): boolean {
+export function roomMatchesFilter(
+  room: Room,
+  filter: string,
+  favorites?: string[],
+): boolean {
+  if (filter === "Favorites") return favorites?.includes(room.id) ?? false;
   if (filter === "Free Now") return room.status === "free";
   if (filter === "Frees Soon") return room.status === "soon";
   if (filter === "Free 2+ hrs") {
@@ -46,9 +51,10 @@ export function applyRoomFilters(
   room: Room,
   active: string[],
   mode: FilterMode,
+  favorites?: string[],
 ): boolean {
   if (active.length === 0) return true;
   return mode === "all"
-    ? active.every((f) => roomMatchesFilter(room, f))
-    : active.some((f) => roomMatchesFilter(room, f));
+    ? active.every((f) => roomMatchesFilter(room, f, favorites))
+    : active.some((f) => roomMatchesFilter(room, f, favorites));
 }

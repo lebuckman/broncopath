@@ -6,6 +6,7 @@ import { Colors } from "../../constants/colors";
 import { Fonts } from "../../constants/fonts";
 import type { Building, Room } from "../../constants/mockData";
 import { useBuildings } from "../../hooks/useBuildings";
+import { useFavorites } from "../../hooks/useFavorites";
 import { getRooms } from "../../lib/api";
 import {
   FILTER_OPTIONS,
@@ -20,6 +21,7 @@ import ChipFilter from "../../components/ui/ChipFilter";
 
 export default function MapScreen() {
   const { buildings, loading } = useBuildings();
+  const { favorites } = useFavorites();
   const [roomsMap, setRoomsMap] = useState<Record<string, Room[]>>({});
   const [selected, setSelected] = useState<Building | null>(null);
   const [sheetVisible, setSheetVisible] = useState(false);
@@ -35,11 +37,26 @@ export default function MapScreen() {
     });
   }, [buildings]);
 
+  useEffect(() => {
+    if (favorites.length === 0 && activeFilters.includes("Favorites")) {
+      setActiveFilters((prev) => prev.filter((f) => f !== "Favorites"));
+    }
+  }, [favorites]);
+
+  const favoriteIds = favorites.map((f) => f.roomId);
+
+  const filterOptions =
+    favorites.length > 0
+      ? ["All", "Favorites", ...FILTER_OPTIONS.slice(1)]
+      : FILTER_OPTIONS;
+
   const visibleBuildings = buildings.filter((b) => {
     if (activeFilters.length === 0) return true;
     const rooms = roomsMap[b.id];
     if (!rooms) return true;
-    return rooms.some((r) => applyRoomFilters(r, activeFilters, filterMode));
+    return rooms.some((r) =>
+      applyRoomFilters(r, activeFilters, filterMode, favoriteIds),
+    );
   });
 
   function handleMarkerPress(building: Building) {
@@ -127,7 +144,7 @@ export default function MapScreen() {
 
       <View className="mb-4">
         <ChipFilter
-          options={FILTER_OPTIONS}
+          options={filterOptions}
           active={activeFilters}
           onChange={setActiveFilters}
         />

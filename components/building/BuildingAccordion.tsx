@@ -12,6 +12,8 @@ import { Feather } from "@expo/vector-icons";
 import { Colors } from "../../constants/colors";
 import { Fonts } from "../../constants/fonts";
 import type { Room } from "../../constants/mockData";
+import { useFavorites } from "../../hooks/useFavorites";
+import FavoriteButton from "../ui/FavoriteButton";
 import RoomBadge from "../ui/RoomBadge";
 import CountdownTimer from "../ui/CountdownTimer";
 
@@ -23,6 +25,7 @@ if (
 }
 
 interface Props {
+  buildingId: string;
   name: string;
   code: string;
   freeCount: number;
@@ -31,6 +34,7 @@ interface Props {
 }
 
 export default function BuildingAccordion({
+  buildingId,
   name,
   code,
   freeCount,
@@ -38,6 +42,7 @@ export default function BuildingAccordion({
   forceExpanded,
 }: Props) {
   const [expanded, setExpanded] = useState(false);
+  const { isFavorite, toggleFavorite } = useFavorites();
   const isExpanded = expanded || !!forceExpanded;
 
   async function handleShare(room: Room) {
@@ -137,6 +142,10 @@ export default function BuildingAccordion({
                 </Text>
               </View>
               <View className="flex-row items-center gap-2">
+                <FavoriteButton
+                  isFavorite={isFavorite(room.id)}
+                  onToggle={() => toggleFavorite(room.id, buildingId)}
+                />
                 {room.status === "free" && (
                   <Pressable onPress={() => handleShare(room)} hitSlop={8}>
                     <Feather name="share-2" size={14} color={Colors.accent} />

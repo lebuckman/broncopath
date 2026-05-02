@@ -15,6 +15,7 @@ import { Colors } from "../../constants/colors";
 import { Fonts } from "../../constants/fonts";
 import type { Room } from "../../constants/mockData";
 import { useBuildings } from "../../hooks/useBuildings";
+import { useFavorites } from "../../hooks/useFavorites";
 import { getRooms } from "../../lib/api";
 import {
   FILTER_OPTIONS,
@@ -30,6 +31,7 @@ type SearchMode = "buildings" | "rooms";
 export default function RoomsScreen() {
   const { collapseAll } = useLocalSearchParams<{ collapseAll?: string }>();
   const { buildings, loading, error } = useBuildings();
+  const { favorites } = useFavorites();
   const [roomsMap, setRoomsMap] = useState<Record<string, Room[]>>({});
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
   const [filterMode, setFilterMode] = useState<FilterMode>("any");
@@ -44,6 +46,19 @@ export default function RoomsScreen() {
     });
   }, [buildings]);
 
+  useEffect(() => {
+    if (favorites.length === 0 && activeFilters.includes("Favorites")) {
+      setActiveFilters((prev) => prev.filter((f) => f !== "Favorites"));
+    }
+  }, [favorites]);
+
+  const favoriteIds = favorites.map((f) => f.roomId);
+
+  const filterOptions =
+    favorites.length > 0
+      ? ["All", "Favorites", ...FILTER_OPTIONS.slice(1)]
+      : FILTER_OPTIONS;
+
   const trimmed = query.trim().toLowerCase();
 
   const filteredBuildings = buildings
@@ -54,7 +69,7 @@ export default function RoomsScreen() {
         activeFilters.length === 0
           ? allRooms
           : allRooms.filter((r) =>
-              applyRoomFilters(r, activeFilters, filterMode),
+              applyRoomFilters(r, activeFilters, filterMode, favoriteIds),
             );
 
       let rooms: Room[];
@@ -95,6 +110,23 @@ export default function RoomsScreen() {
 
   const totalRooms = filteredBuildings.reduce((s, b) => s + b.rooms.length, 0);
   const totalBuildings = filteredBuildings.length;
+
+  function renderAccordion(b: (typeof filteredBuildings)[number]) {
+    return (
+      <BuildingAccordion
+        key={b.id + (collapseAll ?? "")}
+        buildingId={b.id}
+        name={b.name}
+        code={b.code}
+        freeCount={b.freeCount}
+        rooms={b.rooms}
+        forceExpanded={
+          (searchMode === "rooms" && trimmed.length > 0) ||
+          activeFilters.includes("Favorites")
+        }
+      />
+    );
+  }
 
   return (
     <SafeAreaView
@@ -199,7 +231,7 @@ export default function RoomsScreen() {
         {/* Chip filter */}
         <View className="my-3">
           <ChipFilter
-            options={FILTER_OPTIONS}
+            options={filterOptions}
             active={activeFilters}
             onChange={setActiveFilters}
           />
@@ -338,16 +370,7 @@ export default function RoomsScreen() {
                 </Text>
               </View>
             ) : (
-              filteredBuildings.map((b) => (
-                <BuildingAccordion
-                  key={b.id + (collapseAll ?? "")}
-                  name={b.name}
-                  code={b.code}
-                  freeCount={b.freeCount}
-                  rooms={b.rooms}
-                  forceExpanded={searchMode === "rooms" && trimmed.length > 0}
-                />
-              ))
+              filteredBuildings.map(renderAccordion)
             )}
           </ScrollView>
         )}
