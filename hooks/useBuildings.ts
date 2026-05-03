@@ -24,5 +24,9 @@ export function useBuildings() {
     return () => clearInterval(id);
   }, []);
 
-  return { buildings, loading, error };
+  function refresh() {
+    return getBuildings().then(setBuildings).catch(setError);
+  }
+
+  return { buildings, loading, error, refresh };
 }

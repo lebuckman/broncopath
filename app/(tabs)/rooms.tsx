@@ -8,6 +8,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  RefreshControl,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
@@ -31,7 +32,8 @@ type SearchMode = "buildings" | "rooms";
 
 export default function RoomsScreen() {
   const { collapseAll } = useLocalSearchParams<{ collapseAll?: string }>();
-  const { buildings, loading, error } = useBuildings();
+  const { buildings, loading, error, refresh } = useBuildings();
+  const [refreshing, setRefreshing] = useState(false);
   const { favorites } = useFavorites();
   const [roomsMap, setRoomsMap] = useState<Record<string, Room[]>>(() => {
     const map: Record<string, Room[]> = {};
@@ -49,6 +51,19 @@ export default function RoomsScreen() {
   useEffect(() => {
     if (collapseAll) scrollRef.current?.scrollTo({ y: 0, animated: true });
   }, [collapseAll]);
+
+  async function handleRefresh() {
+    setRefreshing(true);
+    await Promise.all([
+      refresh(),
+      ...buildings.map((b) =>
+        getRooms(b.id).then((rooms) =>
+          setRoomsMap((prev) => ({ ...prev, [b.id]: rooms })),
+        ),
+      ),
+    ]);
+    setRefreshing(false);
+  }
 
   const buildingIds = buildings.map((b) => b.id).join(",");
 
@@ -379,6 +394,13 @@ export default function RoomsScreen() {
             contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
+                tintColor={Colors.accent}
+              />
+            }
           >
             {filteredBuildings.length === 0 ? (
               <View className="items-center justify-center pt-16">
