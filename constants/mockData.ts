@@ -11,6 +11,7 @@ export interface Room {
   status: 'free' | 'busy' | 'soon';
   freesAt?: string;
   freeUntil?: string;
+  courseName?: string;
 }
 
 export interface Building {

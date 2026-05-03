@@ -39,9 +39,11 @@ export default function MapScreen() {
 
     function fetchAllRooms() {
       buildings.forEach((b) => {
-        getRooms(b.id).then((rooms) => {
-          setRoomsMap((prev) => ({ ...prev, [b.id]: rooms }));
-        });
+        getRooms(b.id)
+          .then((rooms) => {
+            setRoomsMap((prev) => ({ ...prev, [b.id]: rooms }));
+          })
+          .catch(() => {});
       });
     }
 

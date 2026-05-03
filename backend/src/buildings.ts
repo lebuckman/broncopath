@@ -1,18 +1,19 @@
-import { Router } from 'express';
-import { db } from './db/index.ts';
-import { buildings, rooms } from './db/schema.ts';
-import { eq } from 'drizzle-orm';
-import { getBuildingOccupancy, getRoomStatus } from './serviceFunctions.ts';
+import { Router } from "express";
+import { db } from "./db/index.ts";
+import { buildings, rooms } from "./db/schema.ts";
+import { eq } from "drizzle-orm";
+import { getBuildingOccupancy, getRoomStatus } from "./serviceFunctions.ts";
 
 const router = Router();
 
-router.get('/', async (_req, res) => {
+router.get("/", async (_req, res) => {
   try {
     const allBuildings = await db.select().from(buildings);
 
     const result = await Promise.all(
       allBuildings.map(async (building) => {
-        const { occupancy, level, roomCount, freeCount } = await getBuildingOccupancy(building.id);
+        const { occupancy, level, roomCount, freeCount } =
+          await getBuildingOccupancy(building.id);
 
         return {
           id: building.id,
@@ -26,17 +27,17 @@ router.get('/', async (_req, res) => {
           freeCount,
           updatedAt: new Date().toISOString(),
         };
-      })
+      }),
     );
 
     res.json(result);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: 'Failed to fetch buildings' });
+    res.status(500).json({ error: "Failed to fetch buildings" });
   }
 });
 
-router.get('/:id/rooms', async (req, res) => {
+router.get("/:id/rooms", async (req, res) => {
   try {
     const buildingId = req.params.id;
 
@@ -47,24 +48,26 @@ router.get('/:id/rooms', async (req, res) => {
 
     const result = await Promise.all(
       buildingRooms.map(async (room) => {
-        const { status, freesAt, freeUntil } = await getRoomStatus(room.id);
+        const roomStatus = await getRoomStatus(room.id);
 
         return {
           id: room.id,
           number: room.number,
           type: room.type,
           capacity: room.capacity,
-          status,
-          ...(freesAt && { freesAt }),
-          ...(freeUntil && { freeUntil }),
+          status: roomStatus.status,
+          ...("freesAt" in roomStatus && { freesAt: roomStatus.freesAt }),
+          ...("freeUntil" in roomStatus && { freeUntil: roomStatus.freeUntil }),
+          ...("courseName" in roomStatus &&
+            roomStatus.courseName && { courseName: roomStatus.courseName }),
         };
-      })
+      }),
     );
 
     res.json(result);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: 'Failed to fetch rooms' });
+    res.status(500).json({ error: "Failed to fetch rooms" });
   }
 });
 

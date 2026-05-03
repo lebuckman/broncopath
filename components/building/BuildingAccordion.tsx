@@ -140,6 +140,14 @@ export default function BuildingAccordion({
                   style={{ color: Colors.text, fontFamily: Fonts.mono }}
                 >
                   {room.number}
+                  {room.courseName ? (
+                    <Text
+                      style={{ color: Colors.muted, fontFamily: Fonts.body }}
+                    >
+                      {" "}
+                      ({room.courseName})
+                    </Text>
+                  ) : null}
                 </Text>
                 <Text
                   className="text-[11px]"

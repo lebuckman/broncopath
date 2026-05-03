@@ -50,15 +50,18 @@ export default function RoomsScreen() {
 
   async function handleRefresh() {
     setRefreshing(true);
-    await Promise.all([
-      refresh(),
-      ...buildings.map((b) =>
-        getRooms(b.id).then((rooms) =>
-          setRoomsMap((prev) => ({ ...prev, [b.id]: rooms })),
+    try {
+      await Promise.all([
+        refresh(),
+        ...buildings.map((b) =>
+          getRooms(b.id).then((rooms) =>
+            setRoomsMap((prev) => ({ ...prev, [b.id]: rooms })),
+          ),
         ),
-      ),
-    ]);
-    setRefreshing(false);
+      ]);
+    } finally {
+      setRefreshing(false);
+    }
   }
 
   const buildingIds = buildings.map((b) => b.id).join(",");
@@ -68,9 +71,11 @@ export default function RoomsScreen() {
 
     function fetchAllRooms() {
       buildings.forEach((b) => {
-        getRooms(b.id).then((rooms) => {
-          setRoomsMap((prev) => ({ ...prev, [b.id]: rooms }));
-        });
+        getRooms(b.id)
+          .then((rooms) => {
+            setRoomsMap((prev) => ({ ...prev, [b.id]: rooms }));
+          })
+          .catch(() => {});
       });
     }
 

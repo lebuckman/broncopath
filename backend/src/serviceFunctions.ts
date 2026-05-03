@@ -84,10 +84,18 @@ export async function getRoomStatus(roomId: string) {
   }
 
   if (currentClass.endTime <= soonThreshold) {
-    return { status: "soon" as const, freesAt: to12Hour(currentClass.endTime) };
+    return {
+      status: "soon" as const,
+      freesAt: to12Hour(currentClass.endTime),
+      ...(currentClass.courseName && { courseName: currentClass.courseName }),
+    };
   }
 
-  return { status: "busy" as const, freesAt: to12Hour(currentClass.endTime) };
+  return {
+    status: "busy" as const,
+    freesAt: to12Hour(currentClass.endTime),
+    ...(currentClass.courseName && { courseName: currentClass.courseName }),
+  };
 }
 
 export function densityFromPercent(percent: number): DensityLevel {
