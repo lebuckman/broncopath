@@ -160,7 +160,9 @@ export default function BuildingAccordion({
                   label={
                     room.status === "soon" && room.freesAt
                       ? `Frees at ${room.freesAt}`
-                      : undefined
+                      : room.status === "free" && room.freeUntil
+                        ? `Until ${room.freeUntil}`
+                        : undefined
                   }
                 />
               </View>

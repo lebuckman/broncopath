@@ -25,6 +25,7 @@ interface Props {
 
 function roomBadgeLabel(room: Room): string | undefined {
   if (room.status === "soon" && room.freesAt) return `Frees at ${room.freesAt}`;
+  if (room.status === "free" && room.freeUntil) return `Until ${room.freeUntil}`;
   return undefined;
 }
 
@@ -208,11 +209,7 @@ export default function BuildingDetailSheet({
                         )}
                       <RoomBadge
                         status={room.status}
-                        label={
-                          room.status === "soon"
-                            ? roomBadgeLabel(room)
-                            : undefined
-                        }
+                        label={roomBadgeLabel(room)}
                       />
                     </View>
                   </View>
