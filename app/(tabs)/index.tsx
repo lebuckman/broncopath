@@ -14,6 +14,7 @@ import BuildingCardSkeleton from "../../components/building/BuildingCardSkeleton
 import BuildingDetailSheet from "../../components/building/BuildingDetailSheet";
 import SectionLabel from "../../components/ui/SectionLabel";
 import NowPill from "../../components/ui/NowPill";
+import InfoModal from "../../components/ui/InfoModal";
 
 function getGreeting(): string {
   const h = new Date().getHours();
@@ -36,6 +37,7 @@ export default function HomeScreen() {
   const [routePressed, setRoutePressed] = useState(false);
   const [favoriteSheetBuilding, setFavoriteSheetBuilding] =
     useState<Building | null>(null);
+  const [showInfo, setShowInfo] = useState(false);
 
   const favoriteBuildings = buildings.filter((b) =>
     favoriteBuildingIds.includes(b.id),
@@ -64,12 +66,24 @@ export default function HomeScreen() {
         >
           {getGreeting()}, Bronco
         </Text>
-        <Text
-          className="text-[26px] mb-6"
-          style={{ color: Colors.text, fontFamily: Fonts.display }}
+        <View
+          className="mb-6"
+          style={{ flexDirection: "row", alignItems: "center", gap: 2 }}
         >
-          What's happening now
-        </Text>
+          <Text
+            className="text-[26px]"
+            style={{ color: Colors.text, fontFamily: Fonts.display }}
+          >
+            What's happening now
+          </Text>
+          <Pressable
+            onPress={() => setShowInfo(true)}
+            hitSlop={8}
+            style={{ padding: 4 }}
+          >
+            <Feather name="info" size={14} color={Colors.muted} />
+          </Pressable>
+        </View>
 
         {/* Live indicator */}
         <NowPill
@@ -216,6 +230,8 @@ export default function HomeScreen() {
         visible={favoriteSheetBuilding !== null}
         onClose={() => setFavoriteSheetBuilding(null)}
       />
+
+      <InfoModal visible={showInfo} onClose={() => setShowInfo(false)} />
     </SafeAreaView>
   );
 }
