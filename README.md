@@ -37,8 +37,8 @@ This project was created following Agile Methodologies (Scrum) with an AI-augmen
 
 - [React Native](https://reactnative.dev/) + [Expo SDK](https://expo.dev/) with [Expo Router v4](https://docs.expo.dev/router/introduction/)
 - [NativeWind v4](https://www.nativewind.dev/) — Tailwind CSS for React Native
-- [react-native-maps](https://github.com/react-native-maps/react-native-maps) + Google Maps SDK
-- [TanStack Query v5](https://tanstack.com/query/latest) — data fetching and caching
+- [react-native-maps](https://github.com/react-native-maps/react-native-maps) — Apple Maps (no API key required)
+- Custom hooks + module-level singleton cache — data fetching, prefetch on launch, 60s polling
 
 **Backend**
 
@@ -67,6 +67,21 @@ cd broncopath
 npm install
 ```
 
+### Starting the backend
+
+The app fetches live data from the Express backend — it must be running before you launch the app.
+
+```bash
+cd backend
+npm install   # first time only
+npm run dev
+```
+
+The server starts on `http://localhost:3000`. Copy `.env.example` to `.env.local` in the project root if you haven't already — `EXPO_PUBLIC_API_BASE_URL` defaults to `http://localhost:3000`.
+
+> [!Note]
+> The backend connects to a Neon (serverless PostgreSQL) database. Ensure `DATABASE_URL` is set in `backend/.env` before running.
+
 ### Running on iOS
 
 BroncoPath uses Expo SDK 55, which requires a full native build — the prebuilt Expo Go app only supports up to SDK 54. Use `expo run:ios` instead of `expo start`.
@@ -87,32 +102,35 @@ npx expo run:ios
 ```
 broncopath/
 ├── app/                        # Expo Router screens
-│   ├── _layout.tsx             # Root layout
-│   └── (tabs)/                 # Tab-based navigation
+│   ├── _layout.tsx             # Root layout + branded loading screen
+│   └── (tabs)/
+│       ├── _layout.tsx         # Tab navigator
 │       ├── index.tsx           # Home / Dashboard
 │       ├── map.tsx             # Campus Map
 │       ├── rooms.tsx           # Find a Room
-│       └── route.tsx           # Route Planner
+│       └── route.tsx           # Route Planner (in development)
 │
 ├── components/
-│   ├── ui/                     # Primitive components
-│   ├── building/               # Building-specific components
-│   ├── map/                    # Map components
-│   └── route/                  # Route components
+│   ├── LoadingScreen.tsx       # Branded launch screen with data prefetch
+│   ├── ui/                     # Primitive components (badges, buttons, filters)
+│   ├── building/               # Building cards, accordions, detail sheet
+│   ├── map/                    # Map markers, legend
+│   └── route/                  # Route cards (in development)
 │
-├── constants/                  # Colors, mock data, types, config
-├── hooks/                      # Custom data hooks
-├── lib/                        # API fetch wrapper
+├── constants/                  # Colors, fonts, types, campus config
+├── hooks/                      # useBuildings, useRooms, useFavorites, useRoutes
+├── lib/                        # API client, data cache, room filter logic
 ├── docs/
 │   ├── deliverables/           # Agile/Scrum deliverables
 │   └── contexts/               # AI context references
 │       ├── DESIGN.md           # Visual design system
 │       └── REQUIREMENTS.md     # Engineering requirements & API contracts
 │
-└── backend/                    # Express API + Drizzle schema (WIP)
+└── backend/                    # Express API + Drizzle schema
     ├── src/
-    │   ├── routes/
-    │   ├── db/
-    │   └── index.ts
+    │   ├── buildings.ts        # Buildings + rooms endpoints
+    │   ├── serviceFunctions.ts # Room status derived from schedule data
+    │   ├── db/                 # Drizzle schema + seed
+    │   └── index.ts            # Express entry point
     └── scraper/                # Python CPP schedule scraper
 ```
