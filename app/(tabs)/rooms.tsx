@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocalSearchParams } from "expo-router";
 import {
   ScrollView,
@@ -44,6 +44,11 @@ export default function RoomsScreen() {
   const [filterMode, setFilterMode] = useState<FilterMode>("any");
   const [query, setQuery] = useState("");
   const [searchMode, setSearchMode] = useState<SearchMode>("buildings");
+  const scrollRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    if (collapseAll) scrollRef.current?.scrollTo({ y: 0, animated: true });
+  }, [collapseAll]);
 
   useEffect(() => {
     buildings.forEach((b) => {
@@ -342,6 +347,7 @@ export default function RoomsScreen() {
           </View>
         ) : (
           <ScrollView
+            ref={scrollRef}
             className="flex-1"
             contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}
             showsVerticalScrollIndicator={false}
