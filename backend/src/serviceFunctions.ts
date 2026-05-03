@@ -27,7 +27,7 @@ export function to12Hour(time24: string): string {
   const mm = Number(mmStr);
   const period = hh >= 12 ? "PM" : "AM";
   const hour = hh % 12 || 12;
-  return `${hour}:${String(mm).padStart(2, "0")} ${period}`;
+  return `${hour}:${String(mm).padStart(2, "0")}${period}`;
 }
 
 export function addMinutes(time24: string, minutes: number): string {

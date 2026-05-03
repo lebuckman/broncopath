@@ -145,7 +145,7 @@ export default function BuildingAccordion({
                       style={{ color: Colors.muted, fontFamily: Fonts.body }}
                     >
                       {" "}
-                      ({room.courseName})
+                      ({room.courseName.replace(/\s+/g, "")})
                     </Text>
                   ) : null}
                 </Text>
@@ -177,7 +177,7 @@ export default function BuildingAccordion({
                   status={room.status}
                   label={
                     room.status === "soon" && room.freesAt
-                      ? `Frees at ${room.freesAt}`
+                      ? `Free at ${room.freesAt}`
                       : room.status === "free" && room.freeUntil
                         ? `Until ${room.freeUntil}`
                         : undefined

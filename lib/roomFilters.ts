@@ -10,7 +10,7 @@ export interface FilterGroup {
 export const FILTER_GROUPS: FilterGroup[] = [
   {
     label: "Availability",
-    options: ["Free Now", "Frees Soon", "Free 2+ hrs", "Busy"],
+    options: ["Free Now", "Free Soon", "Free 2+ hrs", "Busy"],
   },
   {
     label: "Type",
@@ -42,7 +42,7 @@ export function roomMatchesFilter(
 ): boolean {
   if (filter === "Favorites") return favorites?.includes(room.id) ?? false;
   if (filter === "Free Now") return room.status === "free";
-  if (filter === "Frees Soon") return room.status === "soon";
+  if (filter === "Free Soon") return room.status === "soon";
   if (filter === "Free 2+ hrs") {
     if (room.status !== "free") return false;
     if (!room.freeUntil) return true;

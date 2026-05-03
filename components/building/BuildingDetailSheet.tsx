@@ -24,7 +24,7 @@ interface Props {
 }
 
 function roomBadgeLabel(room: Room): string | undefined {
-  if (room.status === "soon" && room.freesAt) return `Frees at ${room.freesAt}`;
+  if (room.status === "soon" && room.freesAt) return `Free at ${room.freesAt}`;
   if (room.status === "free" && room.freeUntil)
     return `Until ${room.freeUntil}`;
   return undefined;
@@ -194,7 +194,7 @@ export default function BuildingDetailSheet({
                             }}
                           >
                             {" "}
-                            ({room.courseName})
+                            ({room.courseName.replace(/\s+/g, "")})
                           </Text>
                         ) : null}
                       </Text>
