@@ -17,6 +17,7 @@ import type { Room } from "../../constants/mockData";
 import { useBuildings } from "../../hooks/useBuildings";
 import { useFavorites } from "../../hooks/useFavorites";
 import { getRooms } from "../../lib/api";
+import { getCachedBuildings, getCachedRooms } from "../../lib/dataCache";
 import {
   FILTER_OPTIONS,
   applyRoomFilters,
@@ -32,7 +33,13 @@ export default function RoomsScreen() {
   const { collapseAll } = useLocalSearchParams<{ collapseAll?: string }>();
   const { buildings, loading, error } = useBuildings();
   const { favorites } = useFavorites();
-  const [roomsMap, setRoomsMap] = useState<Record<string, Room[]>>({});
+  const [roomsMap, setRoomsMap] = useState<Record<string, Room[]>>(() => {
+    const map: Record<string, Room[]> = {};
+    getCachedBuildings().forEach((b) => {
+      map[b.id] = getCachedRooms(b.id);
+    });
+    return map;
+  });
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
   const [filterMode, setFilterMode] = useState<FilterMode>("any");
   const [query, setQuery] = useState("");

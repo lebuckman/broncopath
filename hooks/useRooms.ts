@@ -1,10 +1,15 @@
 import { useState, useEffect } from "react";
 import { getRooms } from "../lib/api";
 import type { Room } from "../constants/mockData";
+import { getCachedRooms, isRoomsCached } from "../lib/dataCache";
 
 export function useRooms(buildingId: string) {
-  const [rooms, setRooms] = useState<Room[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [rooms, setRooms] = useState<Room[]>(() =>
+    buildingId ? getCachedRooms(buildingId) : [],
+  );
+  const [loading, setLoading] = useState(() =>
+    buildingId ? !isRoomsCached(buildingId) : false,
+  );
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
@@ -21,7 +26,7 @@ export function useRooms(buildingId: string) {
         .finally(() => setLoading(false));
     }
 
-    setLoading(true);
+    if (!isRoomsCached(buildingId)) setLoading(true);
     setError(null);
     fetchRooms();
 

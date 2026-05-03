@@ -1,10 +1,13 @@
 import { useState, useEffect } from "react";
 import { getBuildings } from "../lib/api";
 import type { Building } from "../constants/mockData";
+import { getCachedBuildings, isBuildingsCached } from "../lib/dataCache";
 
 export function useBuildings() {
-  const [buildings, setBuildings] = useState<Building[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [buildings, setBuildings] = useState<Building[]>(() =>
+    getCachedBuildings(),
+  );
+  const [loading, setLoading] = useState(() => !isBuildingsCached());
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {

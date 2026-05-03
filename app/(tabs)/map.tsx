@@ -8,6 +8,7 @@ import type { Building, Room } from "../../constants/mockData";
 import { useBuildings } from "../../hooks/useBuildings";
 import { useFavorites } from "../../hooks/useFavorites";
 import { getRooms } from "../../lib/api";
+import { getCachedBuildings, getCachedRooms } from "../../lib/dataCache";
 import {
   FILTER_OPTIONS,
   applyRoomFilters,
@@ -22,7 +23,13 @@ import ChipFilter from "../../components/ui/ChipFilter";
 export default function MapScreen() {
   const { buildings, loading } = useBuildings();
   const { favorites } = useFavorites();
-  const [roomsMap, setRoomsMap] = useState<Record<string, Room[]>>({});
+  const [roomsMap, setRoomsMap] = useState<Record<string, Room[]>>(() => {
+    const map: Record<string, Room[]> = {};
+    getCachedBuildings().forEach((b) => {
+      map[b.id] = getCachedRooms(b.id);
+    });
+    return map;
+  });
   const [selected, setSelected] = useState<Building | null>(null);
   const [sheetVisible, setSheetVisible] = useState(false);
   const [mapHeight, setMapHeight] = useState(0);
