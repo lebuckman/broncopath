@@ -25,7 +25,8 @@ interface Props {
 
 function roomBadgeLabel(room: Room): string | undefined {
   if (room.status === "soon" && room.freesAt) return `Frees at ${room.freesAt}`;
-  if (room.status === "free" && room.freeUntil) return `Until ${room.freeUntil}`;
+  if (room.status === "free" && room.freeUntil)
+    return `Until ${room.freeUntil}`;
   return undefined;
 }
 
@@ -80,10 +81,20 @@ export default function BuildingDetailSheet({
   })();
 
   async function handleShare(room: Room) {
+    const statusLine = room.freeUntil
+      ? `🟢 Free until ${room.freeUntil}`
+      : `🟢 Free`;
+    const capacityStr =
+      room.capacity > 0 ? `${room.capacity} seats` : "Unknown capacity";
+    const message = [
+      `📍 Room ${room.number} · ${building?.name} (${building?.code})`,
+      `🪑 ${capacityStr} · ${room.type}`,
+      statusLine,
+      `—`,
+      `Sent via BroncoPath 🐴`,
+    ].join("\n");
     try {
-      await Share.share({
-        message: `📍 Room ${room.number} is free right now!\nBuilding: ${building?.name}\nCapacity: ${room.capacity > 0 ? `${room.capacity} seats` : "Unknown"}\nStatus: Free\n—\nSent via BroncoPath 🐴`,
-      });
+      await Share.share({ message });
     } catch {
       // user dismissed the share sheet
     }

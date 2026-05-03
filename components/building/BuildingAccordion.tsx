@@ -46,10 +46,20 @@ export default function BuildingAccordion({
   const isExpanded = expanded || !!forceExpanded;
 
   async function handleShare(room: Room) {
+    const statusLine = room.freeUntil
+      ? `🟢 Free until ${room.freeUntil}`
+      : `🟢 Free`;
+    const capacityStr =
+      room.capacity > 0 ? `${room.capacity} seats` : "Unknown capacity";
+    const message = [
+      `📍 Room ${room.number} · ${name} (${code})`,
+      `🪑 ${capacityStr} · ${room.type}`,
+      statusLine,
+      `—`,
+      `Sent via BroncoPath 🐴`,
+    ].join("\n");
     try {
-      await Share.share({
-        message: `📍 Room ${room.number} is free right now!\nBuilding: ${name}\nCapacity: ${room.capacity > 0 ? `${room.capacity} seats` : "Unknown"}\nStatus: Free\n—\nSent via BroncoPath 🐴`,
-      });
+      await Share.share({ message });
     } catch {
       // user dismissed the share sheet — nothing to do
     }
