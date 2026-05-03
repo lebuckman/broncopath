@@ -45,7 +45,7 @@ export default function NowPill({ updatedAt }: Props) {
         className="text-[11px]"
         style={{ color: Colors.accent, fontFamily: Fonts.body }}
       >
-        Live predictions · Updated {timeLabel}
+        Live availability · Updated {timeLabel}
       </Text>
     </View>
   );
