@@ -19,14 +19,10 @@ import { useBuildings } from "../../hooks/useBuildings";
 import { useFavorites } from "../../hooks/useFavorites";
 import { getRooms } from "../../lib/api";
 import { getCachedBuildings, getCachedRooms } from "../../lib/dataCache";
-import {
-  FILTER_OPTIONS,
-  applyRoomFilters,
-  type FilterMode,
-} from "../../lib/roomFilters";
+import { applyRoomFilters, type FilterMode } from "../../lib/roomFilters";
 import BuildingAccordion from "../../components/building/BuildingAccordion";
 import BuildingAccordionSkeleton from "../../components/building/BuildingAccordionSkeleton";
-import ChipFilter from "../../components/ui/ChipFilter";
+import GroupedChipFilter from "../../components/ui/GroupedChipFilter";
 
 type SearchMode = "buildings" | "rooms";
 
@@ -92,14 +88,6 @@ export default function RoomsScreen() {
   const favoriteIds = useMemo(
     () => favorites.map((f) => f.roomId),
     [favorites],
-  );
-
-  const filterOptions = useMemo(
-    () =>
-      favorites.length > 0
-        ? ["All", "Favorites", ...FILTER_OPTIONS.slice(1)]
-        : FILTER_OPTIONS,
-    [favorites.length],
   );
 
   const trimmed = query.trim().toLowerCase();
@@ -284,10 +272,10 @@ export default function RoomsScreen() {
 
         {/* Chip filter */}
         <View className="my-3">
-          <ChipFilter
-            options={filterOptions}
+          <GroupedChipFilter
             active={activeFilters}
             onChange={setActiveFilters}
+            showFavorites={favorites.length > 0}
           />
         </View>
 

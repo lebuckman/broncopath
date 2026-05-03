@@ -1,17 +1,26 @@
 import type { Room } from "../constants/mockData";
 
-export const FILTER_OPTIONS = [
-  "All",
-  "Free Now",
-  "Frees Soon",
-  "Free 2+ hrs",
-  "35+ seats",
-  "Labs",
-  "Seminar",
-  "Lecture",
-];
-
 export type FilterMode = "any" | "all";
+
+export interface FilterGroup {
+  label: string;
+  options: string[];
+}
+
+export const FILTER_GROUPS: FilterGroup[] = [
+  {
+    label: "Availability",
+    options: ["Free Now", "Frees Soon", "Free 2+ hrs", "Busy"],
+  },
+  {
+    label: "Type",
+    options: ["Lecture", "Lab", "Seminar"],
+  },
+  {
+    label: "Seats",
+    options: ["Small (≤10)", "Medium (11–35)", "Large (36+)"],
+  },
+];
 
 function parseTimeMs(time12: string): number | null {
   const m = time12.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
@@ -40,10 +49,13 @@ export function roomMatchesFilter(
     const t = parseTimeMs(room.freeUntil);
     return t !== null && t - Date.now() >= 2 * 60 * 60 * 1000;
   }
-  if (filter === "35+ seats") return room.capacity >= 35;
-  if (filter === "Labs") return room.type.toLowerCase().includes("lab");
-  if (filter === "Seminar") return room.type.toLowerCase().includes("seminar");
+  if (filter === "Busy") return room.status === "busy";
+  if (filter === "Small (≤10)") return room.capacity > 0 && room.capacity <= 10;
+  if (filter === "Medium (11–35)") return room.capacity >= 11 && room.capacity <= 35;
+  if (filter === "Large (36+)") return room.capacity >= 36;
   if (filter === "Lecture") return room.type.toLowerCase().includes("lecture");
+  if (filter === "Lab") return room.type.toLowerCase().includes("lab");
+  if (filter === "Seminar") return room.type.toLowerCase().includes("seminar");
   return true;
 }
 

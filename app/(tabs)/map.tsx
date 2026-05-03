@@ -9,16 +9,12 @@ import { useBuildings } from "../../hooks/useBuildings";
 import { useFavorites } from "../../hooks/useFavorites";
 import { getRooms } from "../../lib/api";
 import { getCachedBuildings, getCachedRooms } from "../../lib/dataCache";
-import {
-  FILTER_OPTIONS,
-  applyRoomFilters,
-  type FilterMode,
-} from "../../lib/roomFilters";
+import { applyRoomFilters, type FilterMode } from "../../lib/roomFilters";
 import { CPP_REGION } from "../../constants/campus";
 import BuildingMarker from "../../components/map/BuildingMarker";
 import MapLegend from "../../components/map/MapLegend";
 import BuildingDetailSheet from "../../components/building/BuildingDetailSheet";
-import ChipFilter from "../../components/ui/ChipFilter";
+import GroupedChipFilter from "../../components/ui/GroupedChipFilter";
 
 export default function MapScreen() {
   const { buildings, loading } = useBuildings();
@@ -61,11 +57,6 @@ export default function MapScreen() {
   }, [favorites]);
 
   const favoriteIds = favorites.map((f) => f.roomId);
-
-  const filterOptions =
-    favorites.length > 0
-      ? ["All", "Favorites", ...FILTER_OPTIONS.slice(1)]
-      : FILTER_OPTIONS;
 
   const visibleBuildings = buildings.filter((b) => {
     if (activeFilters.length === 0) return true;
@@ -160,10 +151,10 @@ export default function MapScreen() {
       </View>
 
       <View className="mb-4">
-        <ChipFilter
-          options={filterOptions}
+        <GroupedChipFilter
           active={activeFilters}
           onChange={setActiveFilters}
+          showFavorites={favorites.length > 0}
         />
       </View>
 
