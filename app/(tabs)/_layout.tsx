@@ -3,6 +3,8 @@ import { Tabs } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 
 export default function TabsLayout() {
+  const lastHomePress = useRef(0);
+  const lastMapPress = useRef(0);
   const lastRoomsPress = useRef(0);
 
   return (
@@ -34,6 +36,15 @@ export default function TabsLayout() {
             <Feather name="home" size={20} color={color} />
           ),
         }}
+        listeners={({ navigation }) => ({
+          tabPress: () => {
+            const now = Date.now();
+            if (now - lastHomePress.current < 300) {
+              navigation.setParams({ scrollToTop: now });
+            }
+            lastHomePress.current = now;
+          },
+        })}
       />
       <Tabs.Screen
         name="map"
@@ -43,6 +54,15 @@ export default function TabsLayout() {
             <Feather name="map" size={20} color={color} />
           ),
         }}
+        listeners={({ navigation }) => ({
+          tabPress: () => {
+            const now = Date.now();
+            if (now - lastMapPress.current < 300) {
+              navigation.setParams({ recenterMap: now });
+            }
+            lastMapPress.current = now;
+          },
+        })}
       />
       <Tabs.Screen
         name="rooms"

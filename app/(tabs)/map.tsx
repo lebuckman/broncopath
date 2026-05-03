@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { View, Text, ActivityIndicator, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useLocalSearchParams } from "expo-router";
 import MapView from "react-native-maps";
 import { Colors } from "../../constants/colors";
 import { Fonts } from "../../constants/fonts";
@@ -17,6 +18,8 @@ import BuildingDetailSheet from "../../components/building/BuildingDetailSheet";
 import GroupedChipFilter from "../../components/ui/GroupedChipFilter";
 
 export default function MapScreen() {
+  const { recenterMap } = useLocalSearchParams<{ recenterMap?: string }>();
+  const mapRef = useRef<MapView>(null);
   const { buildings, loading } = useBuildings();
   const { favorites } = useFavorites();
   const [roomsMap, setRoomsMap] = useState<Record<string, Room[]>>(() => {
@@ -31,6 +34,10 @@ export default function MapScreen() {
   const [mapHeight, setMapHeight] = useState(0);
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
   const [filterMode, setFilterMode] = useState<FilterMode>("any");
+
+  useEffect(() => {
+    if (recenterMap) mapRef.current?.animateToRegion(CPP_REGION, 500);
+  }, [recenterMap]);
 
   const buildingIds = buildings.map((b) => b.id).join(",");
 
@@ -189,6 +196,7 @@ export default function MapScreen() {
         ) : (
           <>
             <MapView
+              ref={mapRef}
               style={{ width: "100%", height: mapHeight }}
               initialRegion={CPP_REGION}
               showsUserLocation

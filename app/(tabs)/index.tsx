@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ScrollView, View, Text, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import { MaterialIcons } from "@expo/vector-icons";
 import { Colors } from "../../constants/colors";
@@ -23,8 +23,14 @@ function getGreeting(): string {
 }
 
 export default function HomeScreen() {
+  const { scrollToTop } = useLocalSearchParams<{ scrollToTop?: string }>();
+  const scrollRef = useRef<ScrollView>(null);
   const router = useRouter();
   const { buildings, loading } = useBuildings();
+
+  useEffect(() => {
+    if (scrollToTop) scrollRef.current?.scrollTo({ y: 0, animated: true });
+  }, [scrollToTop]);
   const { favorites, favoriteBuildingIds } = useFavorites();
   const [roomPressed, setRoomPressed] = useState(false);
   const [routePressed, setRoutePressed] = useState(false);
@@ -42,6 +48,7 @@ export default function HomeScreen() {
       style={{ backgroundColor: Colors.bg }}
     >
       <ScrollView
+        ref={scrollRef}
         className="flex-1"
         contentContainerStyle={{
           paddingHorizontal: 20,
