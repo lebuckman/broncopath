@@ -36,13 +36,23 @@ export default function MapScreen() {
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
   const [filterMode, setFilterMode] = useState<FilterMode>("any");
 
+  const buildingIds = buildings.map((b) => b.id).join(",");
+
   useEffect(() => {
-    buildings.forEach((b) => {
-      getRooms(b.id).then((rooms) => {
-        setRoomsMap((prev) => ({ ...prev, [b.id]: rooms }));
+    if (!buildingIds) return;
+
+    function fetchAllRooms() {
+      buildings.forEach((b) => {
+        getRooms(b.id).then((rooms) => {
+          setRoomsMap((prev) => ({ ...prev, [b.id]: rooms }));
+        });
       });
-    });
-  }, [buildings]);
+    }
+
+    fetchAllRooms();
+    const id = setInterval(fetchAllRooms, 60_000);
+    return () => clearInterval(id);
+  }, [buildingIds]);
 
   useEffect(() => {
     if (favorites.length === 0 && activeFilters.includes("Favorites")) {

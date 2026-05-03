@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useLocalSearchParams } from "expo-router";
 import {
   ScrollView,
@@ -50,13 +50,23 @@ export default function RoomsScreen() {
     if (collapseAll) scrollRef.current?.scrollTo({ y: 0, animated: true });
   }, [collapseAll]);
 
+  const buildingIds = buildings.map((b) => b.id).join(",");
+
   useEffect(() => {
-    buildings.forEach((b) => {
-      getRooms(b.id).then((rooms) => {
-        setRoomsMap((prev) => ({ ...prev, [b.id]: rooms }));
+    if (!buildingIds) return;
+
+    function fetchAllRooms() {
+      buildings.forEach((b) => {
+        getRooms(b.id).then((rooms) => {
+          setRoomsMap((prev) => ({ ...prev, [b.id]: rooms }));
+        });
       });
-    });
-  }, [buildings]);
+    }
+
+    fetchAllRooms();
+    const id = setInterval(fetchAllRooms, 60_000);
+    return () => clearInterval(id);
+  }, [buildingIds]);
 
   useEffect(() => {
     if (favorites.length === 0 && activeFilters.includes("Favorites")) {
@@ -64,61 +74,78 @@ export default function RoomsScreen() {
     }
   }, [favorites]);
 
-  const favoriteIds = favorites.map((f) => f.roomId);
+  const favoriteIds = useMemo(
+    () => favorites.map((f) => f.roomId),
+    [favorites],
+  );
 
-  const filterOptions =
-    favorites.length > 0
-      ? ["All", "Favorites", ...FILTER_OPTIONS.slice(1)]
-      : FILTER_OPTIONS;
+  const filterOptions = useMemo(
+    () =>
+      favorites.length > 0
+        ? ["All", "Favorites", ...FILTER_OPTIONS.slice(1)]
+        : FILTER_OPTIONS,
+    [favorites.length],
+  );
 
   const trimmed = query.trim().toLowerCase();
 
-  const filteredBuildings = buildings
-    .map((b) => {
-      const allRooms = roomsMap[b.id] ?? [];
+  const filteredBuildings = useMemo(() => {
+    return buildings
+      .map((b) => {
+        const allRooms = roomsMap[b.id] ?? [];
 
-      const chipFiltered =
-        activeFilters.length === 0
-          ? allRooms
-          : allRooms.filter((r) =>
-              applyRoomFilters(r, activeFilters, filterMode, favoriteIds),
-            );
+        const chipFiltered =
+          activeFilters.length === 0
+            ? allRooms
+            : allRooms.filter((r) =>
+                applyRoomFilters(r, activeFilters, filterMode, favoriteIds),
+              );
 
-      let rooms: Room[];
-      if (trimmed === "") {
-        rooms = chipFiltered;
-      } else if (searchMode === "buildings") {
-        const buildingMatches =
-          b.name.toLowerCase().includes(trimmed) ||
-          b.code.toLowerCase().includes(trimmed);
-        rooms = buildingMatches ? chipFiltered : [];
-      } else {
-        rooms = chipFiltered.filter(
-          (r) =>
-            r.number.toLowerCase().includes(trimmed) ||
-            r.type.toLowerCase().includes(trimmed),
-        );
-      }
+        let rooms: Room[];
+        if (trimmed === "") {
+          rooms = chipFiltered;
+        } else if (searchMode === "buildings") {
+          const buildingMatches =
+            b.name.toLowerCase().includes(trimmed) ||
+            b.code.toLowerCase().includes(trimmed);
+          rooms = buildingMatches ? chipFiltered : [];
+        } else {
+          rooms = chipFiltered.filter(
+            (r) =>
+              r.number.toLowerCase().includes(trimmed) ||
+              r.type.toLowerCase().includes(trimmed),
+          );
+        }
 
-      const sortedRooms = rooms
-        .slice()
-        .sort((a, b) =>
-          a.number.localeCompare(b.number, undefined, { numeric: true }),
-        );
+        const sortedRooms = rooms
+          .slice()
+          .sort((a, b) =>
+            a.number.localeCompare(b.number, undefined, { numeric: true }),
+          );
 
-      return {
-        ...b,
-        rooms: sortedRooms,
-        freeCount: sortedRooms.filter((r: Room) => r.status === "free").length,
-      };
-    })
-    .filter((b) => b.rooms.length > 0)
-    .sort((a, b) => {
-      const numA = parseInt(a.code.replace(/\D/g, ""), 10);
-      const numB = parseInt(b.code.replace(/\D/g, ""), 10);
-      if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
-      return a.code.localeCompare(b.code);
-    });
+        return {
+          ...b,
+          rooms: sortedRooms,
+          freeCount: sortedRooms.filter((r: Room) => r.status === "free")
+            .length,
+        };
+      })
+      .filter((b) => b.rooms.length > 0)
+      .sort((a, b) => {
+        const numA = parseInt(a.code.replace(/\D/g, ""), 10);
+        const numB = parseInt(b.code.replace(/\D/g, ""), 10);
+        if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+        return a.code.localeCompare(b.code);
+      });
+  }, [
+    buildings,
+    roomsMap,
+    activeFilters,
+    filterMode,
+    favoriteIds,
+    trimmed,
+    searchMode,
+  ]);
 
   const totalRooms = filteredBuildings.reduce((s, b) => s + b.rooms.length, 0);
   const totalBuildings = filteredBuildings.length;

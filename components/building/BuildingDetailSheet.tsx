@@ -23,9 +23,9 @@ interface Props {
   filterRoomIds?: string[];
 }
 
-function roomBadgeLabel(room: Room): string {
+function roomBadgeLabel(room: Room): string | undefined {
   if (room.status === "soon" && room.freesAt) return `Frees at ${room.freesAt}`;
-  return undefined as unknown as string; // fall through to RoomBadge default
+  return undefined;
 }
 
 function densityText(level: Building["level"]): string {
