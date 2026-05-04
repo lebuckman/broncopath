@@ -16,6 +16,7 @@ import { CPP_REGION } from "../../constants/campus";
 import MapLegend from "../../components/map/MapLegend";
 import BuildingDetailSheet from "../../components/building/BuildingDetailSheet";
 import GroupedChipFilter from "../../components/ui/GroupedChipFilter";
+import { useCampusGraph } from "../../hooks/useCampusGraph";
 
 export default function MapScreen() {
   const { recenterMap } = useLocalSearchParams<{ recenterMap?: string }>();
@@ -29,11 +30,23 @@ export default function MapScreen() {
     });
     return map;
   });
+  const { graph, loading: graphLoading, refreshing: graphRefreshing, error: graphError } = useCampusGraph();
   const [selected, setSelected] = useState<Building | null>(null);
   const [sheetVisible, setSheetVisible] = useState(false);
   const [mapHeight, setMapHeight] = useState(0);
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
   const [filterMode, setFilterMode] = useState<FilterMode>("any");
+
+  useEffect(() => {
+    if (!graph) return;
+
+    console.log("Campus graph loaded", {
+      version: graph.version.id,
+      nodes: graph.nodes.length,
+      edges: graph.edges.length,
+      refreshing: graphRefreshing
+    });
+  }, [graph, graphRefreshing]);
 
   useEffect(() => {
     if (recenterMap) {
