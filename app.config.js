@@ -32,7 +32,7 @@ module.exports = {
     },
     plugins: [
       'expo-router',
-      'react-native-maps',
+      '@maplibre/maplibre-react-native',
     ],
   },
 };

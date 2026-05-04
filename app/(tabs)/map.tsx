@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import { View, Text, ActivityIndicator, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams } from "expo-router";
-import MapView from "react-native-maps";
+//import MapView from "react-native-maps"; replace with maplibre
+import { Map, Camera, Marker } from "@maplibre/maplibre-react-native";
 import { Colors } from "../../constants/colors";
 import { Fonts } from "../../constants/fonts";
 import type { Building, Room } from "../../constants/mockData";
@@ -12,14 +13,13 @@ import { getRooms } from "../../lib/api";
 import { getCachedBuildings, getCachedRooms } from "../../lib/dataCache";
 import { applyRoomFilters, type FilterMode } from "../../lib/roomFilters";
 import { CPP_REGION } from "../../constants/campus";
-import BuildingMarker from "../../components/map/BuildingMarker";
 import MapLegend from "../../components/map/MapLegend";
 import BuildingDetailSheet from "../../components/building/BuildingDetailSheet";
 import GroupedChipFilter from "../../components/ui/GroupedChipFilter";
 
 export default function MapScreen() {
   const { recenterMap } = useLocalSearchParams<{ recenterMap?: string }>();
-  const mapRef = useRef<MapView>(null);
+  const cameraRef = useRef<any>(null);
   const { buildings, loading } = useBuildings();
   const { favorites } = useFavorites();
   const [roomsMap, setRoomsMap] = useState<Record<string, Room[]>>(() => {
@@ -36,7 +36,13 @@ export default function MapScreen() {
   const [filterMode, setFilterMode] = useState<FilterMode>("any");
 
   useEffect(() => {
-    if (recenterMap) mapRef.current?.animateToRegion(CPP_REGION, 500);
+    if (recenterMap) {
+      cameraRef.current?.setCamera({
+        centerCoordinate: [CPP_REGION.longitude, CPP_REGION.latitude],
+        zoomLevel: 16,
+        animationDuration: 500,
+      });
+    }
   }, [recenterMap]);
 
   const buildingIds = buildings.map((b) => b.id).join(",");
@@ -195,23 +201,57 @@ export default function MapScreen() {
           </View>
         ) : (
           <>
-            <MapView
-              ref={mapRef}
+            <Map
               style={{ width: "100%", height: mapHeight }}
-              initialRegion={CPP_REGION}
-              showsUserLocation
-              showsMyLocationButton={false}
-              showsCompass={false}
-              toolbarEnabled={false}
+              mapStyle="https://tiles.openfreemap.org/styles/liberty"
+              compass={false}
+              logo={false}
+              attribution={false}
+              onDidFinishLoadingStyle={() => console.log("Map style loaded")}
+              onDidFailLoadingMap={(event) =>
+                console.log("Map failed", event.nativeEvent)
+              }
             >
+              <Camera
+                ref={cameraRef}
+                zoom={16}
+                initialViewState={{
+                  center: [CPP_REGION.longitude, CPP_REGION.latitude],
+                  zoom: 16,
+                }}
+              />
+
               {visibleBuildings.map((building) => (
-                <BuildingMarker
+                <Marker
                   key={building.id}
-                  building={building}
-                  onPress={handleMarkerPress}
-                />
+                  id={building.id}
+                  lngLat={[building.longitude, building.latitude]}
+                  anchor="center"
+                  onPress={() => handleMarkerPress(building)}
+                >
+                  <View
+                    style={{
+                      backgroundColor: Colors.surface,
+                      borderColor: Colors.accent,
+                      borderWidth: 1,
+                      borderRadius: 20,
+                      paddingHorizontal: 8,
+                      paddingVertical: 5,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: Colors.text,
+                        fontFamily: Fonts.bodySemiBold,
+                        fontSize: 11,
+                      }}
+                    >
+                      {building.code}
+                    </Text>
+                  </View>
+                </Marker>
               ))}
-            </MapView>
+            </Map>
 
             <MapLegend />
           </>
