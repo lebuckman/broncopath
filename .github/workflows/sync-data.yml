@@ -1,4 +1,4 @@
-name: Sync OSM Campus Graph
+name: Sync Data
 
 on:
   schedule:
@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  sync-osm:
+  sync-data:
     runs-on: ubuntu-latest
 
     defaults:
@@ -24,10 +24,25 @@ jobs:
           cache: npm
           cache-dependency-path: backend/package-lock.json
 
-      - name: Install dependencies
+      - name: Install Node dependencies
         run: npm ci
 
       - name: Run OSM sync
         run: npm run osm:sync
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests beautifulsoup4 psycopg[binary] python-dotenv
+
+      - name: Sync academics
+        run: npm run academics:sync
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}

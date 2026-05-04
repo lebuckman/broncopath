@@ -150,3 +150,36 @@ export const campusGraphEdgesRelations = relations(
     }),
   }),
 );
+
+export const academicTerms = pgTable("academic_terms", {
+  id: uuid("id").primaryKey().defaultRandom(),
+
+  code: text("code").notNull().unique(),
+  label: text("label").notNull(),
+
+  startDate: text("start_date").notNull(),
+  endDate: text("end_date").notNull(),
+
+  finalsStartDate: text("finals_start_date"),
+  finalsEndDate: text("finals_end_date"),
+
+  sourceUrl: text("source_url"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const academicCalendarEvents = pgTable("academic_calendar_events", {
+  id: uuid("id").primaryKey().defaultRandom(),
+
+  title: text("title").notNull(),
+  eventType: text("event_type").notNull(),
+
+  startDate: text("start_date").notNull(),
+  endDate: text("end_date"),
+
+  affectsClasses: boolean("affects_classes").notNull().default(false),
+  campusClosed: boolean("campus_closed").notNull().default(false),
+
+  sourceUrl: text("source_url"),
+  createdAt: timestamp("created_at").defaultNow(),
+});

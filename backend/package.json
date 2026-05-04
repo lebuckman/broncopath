@@ -28,6 +28,7 @@
     "dev": "npx tsx --watch src/index.ts",
     "build": "tsc",
     "db:push": "drizzle-kit push",
-    "osm:sync": "tsx src/services/syncOSM.ts"
+    "osm:sync": "tsx crons/syncOSM.ts",
+    "academics:sync": "python crons/sync_academics.py"
   }
 }
