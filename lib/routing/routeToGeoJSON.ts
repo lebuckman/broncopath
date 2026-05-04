@@ -22,3 +22,12 @@ export function routeToLineString(edges: RoutingGraphEdge[]) {
     properties: {},
   };
 }
+
+export type GeoJSONLine = {
+  type: "Feature";
+  geometry: {
+    type: "LineString";
+    coordinates: [number, number][];
+  };
+  properties: {};
+};

@@ -1,5 +1,6 @@
 export type RoutingGraphNode = {
   id: string;
+  osmNodeId?: string | null;
   lat: number;
   lng: number;
   type: string;

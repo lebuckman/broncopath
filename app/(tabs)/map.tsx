@@ -15,11 +15,16 @@ import { getCachedBuildings, getCachedRooms } from "../../lib/dataCache";
 import { applyRoomFilters, type FilterMode } from "../../lib/roomFilters";
 import { CPP_REGION } from "../../constants/campus";
 import MapLegend from "../../components/map/MapLegend";
+import RoutePlannerSheet from "../../components/map/RoutePlannerSheet";
+import FloatingMapSearchBar from "../../components/map/FloatingMapSearchBar";
 import BuildingDetailSheet from "../../components/building/BuildingDetailSheet";
-import GroupedChipFilter from "../../components/ui/GroupedChipFilter";
 import { buildRoutingGraph } from "../../lib/routing/buildGraph";
 import { dijkstra } from "../../lib/routing/dijkstra";
-import { routeToLineString } from "../../lib/routing/routeToGeoJSON";
+import {
+  routeToLineString,
+  type GeoJSONLine,
+} from "../../lib/routing/routeToGeoJSON";
+import { findBuildingNode } from "../../lib/routing/findBuildingNode";
 
 const MAP_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
 
@@ -29,11 +34,8 @@ export default function MapScreen() {
 
   const { buildings, loading } = useBuildings();
   const { favorites } = useFavorites();
-  const {
-    graph,
-    refreshing: graphRefreshing,
-    error: graphError,
-  } = useCampusGraph();
+  const { graph, refreshing: graphRefreshing, error: graphError } =
+    useCampusGraph();
 
   const [roomsMap, setRoomsMap] = useState<Record<string, Room[]>>(() => {
     const map: Record<string, Room[]> = {};
@@ -47,6 +49,19 @@ export default function MapScreen() {
 
   const [selected, setSelected] = useState<Building | null>(null);
   const [sheetVisible, setSheetVisible] = useState(false);
+
+  const [startBuilding, setStartBuilding] = useState<Building | null>(null);
+  const [endBuilding, setEndBuilding] = useState<Building | null>(null);
+  const [routeSheetExpanded, setRouteSheetExpanded] = useState(false);
+
+  const [routeGeoJSON, setRouteGeoJSON] = useState<GeoJSONLine | null>(null);
+  const [routeDistanceMeters, setRouteDistanceMeters] = useState<number | null>(
+    null,
+  );
+  const [routeWalkTimeSeconds, setRouteWalkTimeSeconds] = useState<
+    number | null
+  >(null);
+
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
   const [filterMode, setFilterMode] = useState<FilterMode>("any");
 
@@ -55,39 +70,46 @@ export default function MapScreen() {
     return buildRoutingGraph(graph.nodes, graph.edges);
   }, [graph]);
 
-  const testRouteGeoJSON = useMemo(() => {
-    if (!routingGraph) return null;
-
-    const nodes = Object.values(routingGraph.nodes);
-
-    const start =
-      nodes.find((node) => node.id === "building:17") ??
-      nodes.find((node) => node.type === "building");
-
-    const end =
-      nodes.find((node) => node.id === "building:15") ??
-      nodes.filter((node) => node.type === "building")[10];
-
-    if (!start || !end || start.id === end.id) return null;
-
-    const result = dijkstra(routingGraph, start.id, end.id);
-
-    if (!result) {
-      console.log("Route test failed", {
-        start,
-        end,
-      });
-      return null;
+  useEffect(() => {
+    if (!routingGraph || !startBuilding || !endBuilding) {
+      setRouteGeoJSON(null);
+      setRouteDistanceMeters(null);
+      setRouteWalkTimeSeconds(null);
+      return;
     }
 
-    console.log("Route test", {
-      totalDistance: result.totalDistance,
-      totalTime: result.totalTime,
-      edges: result.path.length,
+    const startNode = findBuildingNode(routingGraph, startBuilding.id);
+    const endNode = findBuildingNode(routingGraph, endBuilding.id);
+
+    console.log("Routing from/to", {
+      startBuilding: startBuilding.id,
+      endBuilding: endBuilding.id,
+      startNode,
+      endNode,
     });
 
-    return routeToLineString(result.path);
-  }, [routingGraph]);
+    if (!startNode || !endNode) {
+      setRouteGeoJSON(null);
+      setRouteDistanceMeters(null);
+      setRouteWalkTimeSeconds(null);
+      return;
+    }
+
+    const result = dijkstra(routingGraph, startNode.id, endNode.id);
+
+    console.log("Route result", result);
+
+    if (!result) {
+      setRouteGeoJSON(null);
+      setRouteDistanceMeters(null);
+      setRouteWalkTimeSeconds(null);
+      return;
+    }
+
+    setRouteGeoJSON(routeToLineString(result.path));
+    setRouteDistanceMeters(result.totalDistance);
+    setRouteWalkTimeSeconds(result.totalTime);
+  }, [routingGraph, startBuilding, endBuilding]);
 
   useEffect(() => {
     if (!graph) return;
@@ -137,7 +159,9 @@ export default function MapScreen() {
 
   useEffect(() => {
     if (favorites.length === 0 && activeFilters.includes("Favorites")) {
-      setActiveFilters((prev) => prev.filter((filter) => filter !== "Favorites"));
+      setActiveFilters((prev) =>
+        prev.filter((filter) => filter !== "Favorites"),
+      );
     }
   }, [favorites, activeFilters]);
 
@@ -159,94 +183,36 @@ export default function MapScreen() {
     setSheetVisible(true);
   }
 
+  function clearRoute() {
+    setStartBuilding(null);
+    setEndBuilding(null);
+    setRouteGeoJSON(null);
+    setRouteDistanceMeters(null);
+    setRouteWalkTimeSeconds(null);
+  }
+
+  function fitCameraToRoute() {
+   const coordinates = routeGeoJSON?.geometry?.coordinates;
+
+    if (!coordinates || coordinates.length === 0) return;
+
+    const lngs = coordinates.map((coord) => coord[0]);
+    const lats = coordinates.map((coord) => coord[1]);
+
+    const center: [number, number] = [
+      (Math.min(...lngs) + Math.max(...lngs)) / 2,
+      (Math.min(...lats) + Math.max(...lats)) / 2,
+    ];
+
+    cameraRef.current?.flyTo(center, 900);
+  }
+
   return (
     <SafeAreaView
       edges={["top"]}
       className="flex-1"
       style={{ backgroundColor: Colors.bg }}
     >
-      <View className="px-5 pt-6 pb-4">
-        <Text
-          className="text-[26px]"
-          style={{ color: Colors.text, fontFamily: Fonts.display }}
-        >
-          Campus Map
-        </Text>
-
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginTop: 4,
-          }}
-        >
-          <Text
-            className="text-[12px]"
-            style={{ color: Colors.muted, fontFamily: Fonts.body }}
-          >
-            Tap any building to explore
-          </Text>
-
-          <View
-            style={{
-              flexDirection: "row",
-              backgroundColor: Colors.surface,
-              borderRadius: 6,
-              overflow: "hidden",
-            }}
-          >
-            <Pressable
-              onPress={() => setFilterMode("any")}
-              style={{
-                paddingHorizontal: 7,
-                paddingVertical: 4,
-                backgroundColor:
-                  filterMode === "any" ? Colors.accentBg : "transparent",
-              }}
-            >
-              <Text
-                style={{
-                  fontSize: 10,
-                  fontFamily: Fonts.bodyMedium,
-                  color: filterMode === "any" ? Colors.accent : Colors.muted,
-                }}
-              >
-                Any
-              </Text>
-            </Pressable>
-
-            <Pressable
-              onPress={() => setFilterMode("all")}
-              style={{
-                paddingHorizontal: 7,
-                paddingVertical: 4,
-                backgroundColor:
-                  filterMode === "all" ? Colors.accentBg : "transparent",
-              }}
-            >
-              <Text
-                style={{
-                  fontSize: 10,
-                  fontFamily: Fonts.bodyMedium,
-                  color: filterMode === "all" ? Colors.accent : Colors.muted,
-                }}
-              >
-                All
-              </Text>
-            </Pressable>
-          </View>
-        </View>
-      </View>
-
-      <View className="mb-4">
-        <GroupedChipFilter
-          active={activeFilters}
-          onChange={setActiveFilters}
-          showFavorites={favorites.length > 0}
-        />
-      </View>
-
       <View style={{ flex: 1 }}>
         {loading ? (
           <View
@@ -258,6 +224,7 @@ export default function MapScreen() {
             }}
           >
             <ActivityIndicator size="large" color={Colors.accent} />
+
             <Text
               style={{
                 color: Colors.muted,
@@ -283,7 +250,7 @@ export default function MapScreen() {
                 cameraRef.current?.flyTo({
                   center: [CPP_REGION.longitude, CPP_REGION.latitude],
                   zoom: 16,
-                  duration: 500
+                  duration: 500,
                 });
               }}
               onDidFailLoadingMap={(event: any) =>
@@ -296,20 +263,17 @@ export default function MapScreen() {
                   center: [CPP_REGION.longitude, CPP_REGION.latitude],
                   zoom: 16,
                 }}
-
               />
 
-              {testRouteGeoJSON && (
-                <MLRN.GeoJSONSource
-                  id="testRouteSource"
-                  data={testRouteGeoJSON}
-                >
+              {routeGeoJSON && (
+                <MLRN.GeoJSONSource id="routeSource" data={routeGeoJSON}>
                   <MLRN.Layer
-                    id="testRouteLine"
+                    id="routeLine"
                     type="line"
                     paint={{
                       "line-color": "#4ade80",
                       "line-width": 6,
+                      "line-opacity": 0.92,
                     }}
                     layout={{
                       "line-cap": "round",
@@ -319,39 +283,81 @@ export default function MapScreen() {
                 </MLRN.GeoJSONSource>
               )}
 
-              {visibleBuildings.map((building) => (
-                <MLRN.Marker
-                  key={building.id}
-                  id={`building-${building.id}`}
-                  lngLat={[building.longitude, building.latitude]}
-                  anchor="center"
-                  onPress={() => handleMarkerPress(building)}
-                >
-                  <View
-                    style={{
-                      backgroundColor: Colors.surface,
-                      borderColor: Colors.accent,
-                      borderWidth: 1,
-                      borderRadius: 20,
-                      paddingHorizontal: 8,
-                      paddingVertical: 5,
-                    }}
+              {visibleBuildings.map((building) => {
+                const isStart = startBuilding?.id === building.id;
+                const isEnd = endBuilding?.id === building.id;
+
+                return (
+                  <MLRN.Marker
+                    key={building.id}
+                    id={`building-${building.id}`}
+                    lngLat={[building.longitude, building.latitude]}
+                    anchor="center"
+                    onPress={() => handleMarkerPress(building)}
                   >
-                    <Text
+                    <View
                       style={{
-                        color: Colors.text,
-                        fontFamily: Fonts.bodySemiBold,
-                        fontSize: 11,
+                        backgroundColor: isStart
+                          ? "#3b82f6"
+                          : isEnd
+                            ? "#ef4444"
+                            : Colors.surface,
+                        borderColor: Colors.accent,
+                        borderWidth: 1,
+                        borderRadius: 20,
+                        paddingHorizontal: 8,
+                        paddingVertical: 5,
                       }}
                     >
-                      {building.code}
-                    </Text>
-                  </View>
-                </MLRN.Marker>
-              ))}
+                      <Text
+                        style={{
+                          color: Colors.text,
+                          fontFamily: Fonts.bodySemiBold,
+                          fontSize: 11,
+                        }}
+                      >
+                        {building.code}
+                      </Text>
+                    </View>
+                  </MLRN.Marker>
+                );
+              })}
             </MLRN.Map>
 
-            <MapLegend />
+            <FloatingMapSearchBar
+              activeFilters={activeFilters}
+              filterMode={filterMode}
+              showFavorites={favorites.length > 0}
+              onChangeFilters={setActiveFilters}
+              onChangeFilterMode={setFilterMode}
+              onFocusSearch={() => setRouteSheetExpanded(true)}
+            />
+
+            <View
+              pointerEvents="box-none"
+              style={{
+                position: "absolute",
+                top: 88,
+                right: 12,
+                zIndex: 10,
+              }}
+            >
+              <MapLegend />
+            </View>
+
+            <RoutePlannerSheet
+              expanded={routeSheetExpanded}
+              onExpandedChange={setRouteSheetExpanded}
+              buildings={buildings}
+              startBuilding={startBuilding}
+              endBuilding={endBuilding}
+              routeDistanceMeters={routeDistanceMeters}
+              routeWalkTimeSeconds={routeWalkTimeSeconds}
+              onSelectStart={setStartBuilding}
+              onSelectEnd={setEndBuilding}
+              onClearRoute={clearRoute}
+              onGo={fitCameraToRoute}
+            />
           </>
         )}
       </View>
