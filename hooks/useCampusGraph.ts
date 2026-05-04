@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { CampusGraphResponse } from "../lib/api";
-import { getCachedCampusGraph, refreshCampusGraphCache } from "../lib/dataCache";
+import { getCachedCampusGraph, refreshCampusGraphCacheIfNeeded } from "../lib/dataCache";
 
 export function useCampusGraph() {
   const [graph, setGraph] = useState<CampusGraphResponse | null>(null);
@@ -22,10 +22,10 @@ export function useCampusGraph() {
 
         setRefreshing(true);
 
-        const fresh = await refreshCampusGraphCache();
+        const graphResult = await refreshCampusGraphCacheIfNeeded();
 
         if (!cancelled) {
-          setGraph(fresh);
+          setGraph(graphResult);
           setError(null);
         }
       } catch (err) {

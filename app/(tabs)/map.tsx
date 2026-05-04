@@ -1,14 +1,15 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { View, Text, ActivityIndicator, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams } from "expo-router";
-//import MapView from "react-native-maps"; replace with maplibre
-import { Map, Camera, Marker } from "@maplibre/maplibre-react-native";
+import * as MLRN from "@maplibre/maplibre-react-native";
+
 import { Colors } from "../../constants/colors";
 import { Fonts } from "../../constants/fonts";
 import type { Building, Room } from "../../constants/mockData";
 import { useBuildings } from "../../hooks/useBuildings";
 import { useFavorites } from "../../hooks/useFavorites";
+import { useCampusGraph } from "../../hooks/useCampusGraph";
 import { getRooms } from "../../lib/api";
 import { getCachedBuildings, getCachedRooms } from "../../lib/dataCache";
 import { applyRoomFilters, type FilterMode } from "../../lib/roomFilters";
@@ -16,26 +17,77 @@ import { CPP_REGION } from "../../constants/campus";
 import MapLegend from "../../components/map/MapLegend";
 import BuildingDetailSheet from "../../components/building/BuildingDetailSheet";
 import GroupedChipFilter from "../../components/ui/GroupedChipFilter";
-import { useCampusGraph } from "../../hooks/useCampusGraph";
+import { buildRoutingGraph } from "../../lib/routing/buildGraph";
+import { dijkstra } from "../../lib/routing/dijkstra";
+import { routeToLineString } from "../../lib/routing/routeToGeoJSON";
+
+const MAP_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
 
 export default function MapScreen() {
   const { recenterMap } = useLocalSearchParams<{ recenterMap?: string }>();
   const cameraRef = useRef<any>(null);
+
   const { buildings, loading } = useBuildings();
   const { favorites } = useFavorites();
+  const {
+    graph,
+    refreshing: graphRefreshing,
+    error: graphError,
+  } = useCampusGraph();
+
   const [roomsMap, setRoomsMap] = useState<Record<string, Room[]>>(() => {
     const map: Record<string, Room[]> = {};
-    getCachedBuildings().forEach((b) => {
-      map[b.id] = getCachedRooms(b.id);
+
+    getCachedBuildings().forEach((building) => {
+      map[building.id] = getCachedRooms(building.id);
     });
+
     return map;
   });
-  const { graph, loading: graphLoading, refreshing: graphRefreshing, error: graphError } = useCampusGraph();
+
   const [selected, setSelected] = useState<Building | null>(null);
   const [sheetVisible, setSheetVisible] = useState(false);
-  const [mapHeight, setMapHeight] = useState(0);
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
   const [filterMode, setFilterMode] = useState<FilterMode>("any");
+
+  const routingGraph = useMemo(() => {
+    if (!graph) return null;
+    return buildRoutingGraph(graph.nodes, graph.edges);
+  }, [graph]);
+
+  const testRouteGeoJSON = useMemo(() => {
+    if (!routingGraph) return null;
+
+    const nodes = Object.values(routingGraph.nodes);
+
+    const start =
+      nodes.find((node) => node.id === "building:17") ??
+      nodes.find((node) => node.type === "building");
+
+    const end =
+      nodes.find((node) => node.id === "building:15") ??
+      nodes.filter((node) => node.type === "building")[10];
+
+    if (!start || !end || start.id === end.id) return null;
+
+    const result = dijkstra(routingGraph, start.id, end.id);
+
+    if (!result) {
+      console.log("Route test failed", {
+        start,
+        end,
+      });
+      return null;
+    }
+
+    console.log("Route test", {
+      totalDistance: result.totalDistance,
+      totalTime: result.totalTime,
+      edges: result.path.length,
+    });
+
+    return routeToLineString(result.path);
+  }, [routingGraph]);
 
   useEffect(() => {
     if (!graph) return;
@@ -44,54 +96,61 @@ export default function MapScreen() {
       version: graph.version.id,
       nodes: graph.nodes.length,
       edges: graph.edges.length,
-      refreshing: graphRefreshing
+      refreshing: graphRefreshing,
+      error: graphError,
     });
-  }, [graph, graphRefreshing]);
+  }, [graph, graphRefreshing, graphError]);
 
   useEffect(() => {
-    if (recenterMap) {
-      cameraRef.current?.setCamera({
-        centerCoordinate: [CPP_REGION.longitude, CPP_REGION.latitude],
-        zoomLevel: 16,
-        animationDuration: 500,
-      });
-    }
+    if (!recenterMap) return;
+
+    cameraRef.current?.flyTo({
+      center: [CPP_REGION.longitude, CPP_REGION.latitude],
+      zoom: 16,
+      duration: 500,
+    });
   }, [recenterMap]);
 
-  const buildingIds = buildings.map((b) => b.id).join(",");
+  const buildingIds = buildings.map((building) => building.id).join(",");
 
   useEffect(() => {
     if (!buildingIds) return;
 
     function fetchAllRooms() {
-      buildings.forEach((b) => {
-        getRooms(b.id)
+      buildings.forEach((building) => {
+        getRooms(building.id)
           .then((rooms) => {
-            setRoomsMap((prev) => ({ ...prev, [b.id]: rooms }));
+            setRoomsMap((prev) => ({
+              ...prev,
+              [building.id]: rooms,
+            }));
           })
           .catch(() => {});
       });
     }
 
     fetchAllRooms();
-    const id = setInterval(fetchAllRooms, 60_000);
-    return () => clearInterval(id);
-  }, [buildingIds]);
+
+    const intervalId = setInterval(fetchAllRooms, 60_000);
+    return () => clearInterval(intervalId);
+  }, [buildingIds, buildings]);
 
   useEffect(() => {
     if (favorites.length === 0 && activeFilters.includes("Favorites")) {
-      setActiveFilters((prev) => prev.filter((f) => f !== "Favorites"));
+      setActiveFilters((prev) => prev.filter((filter) => filter !== "Favorites"));
     }
-  }, [favorites]);
+  }, [favorites, activeFilters]);
 
-  const favoriteIds = favorites.map((f) => f.roomId);
+  const favoriteIds = favorites.map((favorite) => favorite.roomId);
 
-  const visibleBuildings = buildings.filter((b) => {
+  const visibleBuildings = buildings.filter((building) => {
     if (activeFilters.length === 0) return true;
-    const rooms = roomsMap[b.id];
+
+    const rooms = roomsMap[building.id];
     if (!rooms) return true;
-    return rooms.some((r) =>
-      applyRoomFilters(r, activeFilters, filterMode, favoriteIds),
+
+    return rooms.some((room) =>
+      applyRoomFilters(room, activeFilters, filterMode, favoriteIds),
     );
   });
 
@@ -106,7 +165,6 @@ export default function MapScreen() {
       className="flex-1"
       style={{ backgroundColor: Colors.bg }}
     >
-      {/* Header */}
       <View className="px-5 pt-6 pb-4">
         <Text
           className="text-[26px]"
@@ -114,6 +172,7 @@ export default function MapScreen() {
         >
           Campus Map
         </Text>
+
         <View
           style={{
             flexDirection: "row",
@@ -128,6 +187,7 @@ export default function MapScreen() {
           >
             Tap any building to explore
           </Text>
+
           <View
             style={{
               flexDirection: "row",
@@ -155,6 +215,7 @@ export default function MapScreen() {
                 Any
               </Text>
             </Pressable>
+
             <Pressable
               onPress={() => setFilterMode("all")}
               style={{
@@ -186,11 +247,7 @@ export default function MapScreen() {
         />
       </View>
 
-      {/* Map */}
-      <View
-        style={{ flex: 1 }}
-        onLayout={(e) => setMapHeight(e.nativeEvent.layout.height)}
-      >
+      <View style={{ flex: 1 }}>
         {loading ? (
           <View
             style={{
@@ -214,30 +271,58 @@ export default function MapScreen() {
           </View>
         ) : (
           <>
-            <Map
-              style={{ width: "100%", height: mapHeight }}
-              mapStyle="https://tiles.openfreemap.org/styles/liberty"
+            <MLRN.Map
+              style={{ flex: 1 }}
+              mapStyle={MAP_STYLE_URL}
               compass={false}
               logo={false}
               attribution={false}
-              onDidFinishLoadingStyle={() => console.log("Map style loaded")}
-              onDidFailLoadingMap={(event) =>
+              onDidFinishLoadingStyle={() => {
+                console.log("Map style loaded");
+
+                cameraRef.current?.flyTo({
+                  center: [CPP_REGION.longitude, CPP_REGION.latitude],
+                  zoom: 16,
+                  duration: 500
+                });
+              }}
+              onDidFailLoadingMap={(event: any) =>
                 console.log("Map failed", event.nativeEvent)
               }
             >
-              <Camera
+              <MLRN.Camera
                 ref={cameraRef}
-                zoom={16}
                 initialViewState={{
                   center: [CPP_REGION.longitude, CPP_REGION.latitude],
                   zoom: 16,
                 }}
+
               />
 
+              {testRouteGeoJSON && (
+                <MLRN.GeoJSONSource
+                  id="testRouteSource"
+                  data={testRouteGeoJSON}
+                >
+                  <MLRN.Layer
+                    id="testRouteLine"
+                    type="line"
+                    paint={{
+                      "line-color": "#4ade80",
+                      "line-width": 6,
+                    }}
+                    layout={{
+                      "line-cap": "round",
+                      "line-join": "round",
+                    }}
+                  />
+                </MLRN.GeoJSONSource>
+              )}
+
               {visibleBuildings.map((building) => (
-                <Marker
+                <MLRN.Marker
                   key={building.id}
-                  id={building.id}
+                  id={`building-${building.id}`}
                   lngLat={[building.longitude, building.latitude]}
                   anchor="center"
                   onPress={() => handleMarkerPress(building)}
@@ -262,9 +347,9 @@ export default function MapScreen() {
                       {building.code}
                     </Text>
                   </View>
-                </Marker>
+                </MLRN.Marker>
               ))}
-            </Map>
+            </MLRN.Map>
 
             <MapLegend />
           </>

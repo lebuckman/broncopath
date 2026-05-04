@@ -1,5 +1,5 @@
 import type { Building, Room } from "../constants/mockData";
-import { getBuildings, getRooms, getCampusGraph, type CampusGraphResponse } from "./api";
+import { getBuildings, getRooms, getCampusGraph, getCampusGraphVersion, type CampusGraphResponse } from "./api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const CAMPUS_GRAPH_CACHE_KEY = "campus_graph_cache_v1";
@@ -43,7 +43,6 @@ export async function getCachedCampusGraph(): Promise<CampusGraphResponse | null
     return parsed;
   } catch {
     await AsyncStorage.removeItem(CAMPUS_GRAPH_CACHE_KEY);
-    await AsyncStorage.removeItem(CAMPUS_GRAPH_VERSION_KEY);
     return null;
   }
 }
@@ -52,24 +51,23 @@ export async function saveCampusGraphCache(
   graph: CampusGraphResponse,
 ): Promise<void> {
   _campusGraph = graph;
-
-  await AsyncStorage.multiSet([
-    [CAMPUS_GRAPH_CACHE_KEY, JSON.stringify(graph)],
-    [CAMPUS_GRAPH_VERSION_KEY, graph.version.id],
-  ]);
+  await AsyncStorage.setItem(CAMPUS_GRAPH_CACHE_KEY, JSON.stringify(graph));
 }
 
 export async function clearCampusGraphCache(): Promise<void> {
   _campusGraph = null;
-
-  await AsyncStorage.multiRemove([
-    CAMPUS_GRAPH_CACHE_KEY,
-    CAMPUS_GRAPH_VERSION_KEY,
-  ]);
+  await AsyncStorage.removeItem(CAMPUS_GRAPH_CACHE_KEY);
 }
 
-export async function refreshCampusGraphCache(): Promise<CampusGraphResponse> {
-  const graph = await getCampusGraph();
-  await saveCampusGraphCache(graph);
-  return graph;
+export async function refreshCampusGraphCacheIfNeeded(): Promise<CampusGraphResponse> {
+  const cached = await getCachedCampusGraph();
+  const latestVersion = await getCampusGraphVersion();
+
+  if (cached && cached.version.id === latestVersion.id) {
+    return cached;
+  }
+
+  const freshGraph = await getCampusGraph();
+  await saveCampusGraphCache(freshGraph);
+  return freshGraph;
 }

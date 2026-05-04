@@ -28,6 +28,16 @@ export async function getCampusGraph(): Promise<CampusGraphResponse> {
   return response.json();
 }
 
+export async function getCampusGraphVersion(): Promise<CampusGraphVersion> {
+  const response = await fetch(`${BASE_URL}/api/campus-graph/version`);
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch campus graph version: ${response.status}`);
+  }
+
+  return response.json();
+}
+
 export type CampusGraphVersion = {
   id: string;
   campusId: string;
