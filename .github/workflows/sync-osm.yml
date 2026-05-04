@@ -1,0 +1,33 @@
+name: Sync OSM Campus Graph
+
+on:
+  schedule:
+    - cron: "0 10 1 * *"
+  workflow_dispatch:
+
+jobs:
+  sync-osm:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run OSM sync
+        run: npm run osm:sync
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
