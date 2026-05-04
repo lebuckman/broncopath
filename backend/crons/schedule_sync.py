@@ -71,6 +71,20 @@ class ClassInfo:
         self.component = component
         self.mode = mode
 
+    def to_room_row(self) -> dict | None:
+        if not self.building or not self.room:
+            return None
+
+        capacity = int(self.capacity) if str(self.capacity).isdigit() else 0
+
+        return {
+            "id": f"{self.building}-{self.room}",
+            "buildingId": self.building,
+            "number": self.room,
+            "type": room_type_from_component(self.component),
+            "capacity": capacity,
+        }
+    
     def to_schedule_rows(self, semester: str) -> list[dict]:
         if not self.building or not self.room:
             return []
@@ -486,6 +500,155 @@ def insert_schedule_rows(database_url: str, rows: list[dict], semester: str):
     print(f"Inserted {len(rows)} schedule_entries rows for {semester}.")
 
 
+def upsert_rooms(database_url: str, room_rows: list[dict]) -> None:
+    if not room_rows:
+        print("No rooms to upsert.")
+        return
+
+    by_id = {}
+
+    for row in room_rows:
+        existing = by_id.get(row["id"])
+
+        if not existing:
+            by_id[row["id"]] = row
+            continue
+
+        # Keep largest known capacity.
+        if row["capacity"] > existing["capacity"]:
+            existing["capacity"] = row["capacity"]
+
+        # Prefer useful room type over Unknown.
+        if existing["type"] == "Unknown" and row["type"] != "Unknown":
+            existing["type"] = row["type"]
+
+    deduped = list(by_id.values())
+
+    with psycopg.connect(database_url) as conn:
+        with conn.cursor() as cur:
+            cur.execute("select id from buildings")
+            valid_building_ids = {row[0] for row in cur.fetchall()}
+
+            filtered = [
+                row for row in deduped
+                if row["buildingId"] in valid_building_ids
+            ]
+
+            skipped = [
+                row for row in deduped
+                if row["buildingId"] not in valid_building_ids
+            ]
+
+            if skipped:
+                print(
+                    "Skipped rooms for missing buildings:",
+                    sorted({row["buildingId"] for row in skipped}),
+                )
+
+            cur.executemany(
+                """
+                insert into rooms (id, building_id, number, type, capacity)
+                values (%s, %s, %s, %s, %s)
+                on conflict (id) do update set
+                  building_id = excluded.building_id,
+                  number = excluded.number,
+                  type = excluded.type,
+                  capacity = greatest(rooms.capacity, excluded.capacity)
+                where
+                  rooms.building_id is distinct from excluded.building_id
+                  or rooms.number is distinct from excluded.number
+                  or rooms.type = 'Unknown'
+                  or excluded.capacity > rooms.capacity
+                """,
+                [
+                    (
+                        row["id"],
+                        row["buildingId"],
+                        row["number"],
+                        row["type"],
+                        row["capacity"],
+                    )
+                    for row in filtered
+                ],
+            )
+
+        conn.commit()
+
+    print(f"Upserted {len(filtered)} rooms.")
+
+
+def upsert_schedule_rows(database_url: str, rows: list[dict], semester: str):
+    if not rows:
+        print("No schedule rows to upsert.")
+        return
+
+    seen = set()
+    deduped = []
+
+    for row in rows:
+        key = (
+            row["roomId"],
+            row["dayOfWeek"],
+            row["startTime"],
+            row["endTime"],
+            row["courseName"],
+            row["semester"],
+        )
+
+        if key in seen:
+            continue
+
+        seen.add(key)
+        deduped.append(row)
+
+    with psycopg.connect(database_url) as conn:
+        with conn.cursor() as cur:
+            cur.executemany(
+                """
+                insert into schedule_entries
+                (room_id, day_of_week, start_time, end_time, course_name, semester)
+                values (%s, %s, %s, %s, %s, %s)
+                on conflict
+                (room_id, day_of_week, start_time, end_time, course_name, semester)
+                do nothing
+                """,
+                [
+                    (
+                        row["roomId"],
+                        row["dayOfWeek"],
+                        row["startTime"],
+                        row["endTime"],
+                        row["courseName"],
+                        row["semester"]
+                    )
+                    for row in deduped
+                ],
+            )
+
+        conn.commit()
+
+    print(f"Inserted or skipped {len(deduped)} schedule entries for {semester}.")
+
+
+def room_type_from_component(component: str) -> str:
+    component_lower = (component or "").lower()
+
+    if "lab" in component_lower:
+        return "Lab"
+    if "seminar" in component_lower:
+        return "Seminar"
+    if "lecture" in component_lower:
+        return "Lecture"
+    if "activity" in component_lower:
+        return "Activity"
+    if "clinical" in component_lower:
+        return "Clinical"
+    if "practicum" in component_lower:
+        return "Practicum"
+
+    return component or "Unknown"
+
+
 def sync_schedule(database_url: str) -> None:
     target_term = choose_target_term(database_url)
 
@@ -500,6 +663,7 @@ def sync_schedule(database_url: str) -> None:
     print(f"Using schedule.cpp.edu term code: {semester_code}")
 
     subjects = load_subjects()
+    room_rows: list[dict] = []
     schedule_rows: list[dict] = []
 
     for subject in subjects:
@@ -508,10 +672,17 @@ def sync_schedule(database_url: str) -> None:
         infos = extract_classes_from_html(html)
 
         for info in infos:
+            room_row = info.to_room_row()
+            if room_row:
+                room_rows.append(room_row)
+
             schedule_rows.extend(info.to_schedule_rows(semester_label))
 
-    print("Sample row:", schedule_rows[0] if schedule_rows else "No rows")
-    insert_schedule_rows(database_url, schedule_rows, semester_label)
+    print("Sample room:", room_rows[0] if room_rows else "No rooms")
+    print("Sample schedule row:", schedule_rows[0] if schedule_rows else "No schedule rows")
+
+    upsert_rooms(database_url, room_rows)
+    upsert_schedule_rows(database_url, schedule_rows, semester_label)
 
 
 if __name__ == "__main__":

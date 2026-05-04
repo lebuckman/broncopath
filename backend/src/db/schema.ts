@@ -1,4 +1,4 @@
-import { pgTable, text, integer, real, uuid, timestamp, boolean, jsonb } from 'drizzle-orm/pg-core';
+import { pgTable, text, integer, real, uuid, timestamp, boolean, jsonb, uniqueIndex } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
 export const buildings = pgTable('buildings', {
@@ -17,16 +17,34 @@ export const rooms = pgTable('rooms', {
     capacity: integer('capacity').notNull(),
 });
 
-export const scheduleEntries = pgTable('schedule_entries', {
-    id: uuid('id').primaryKey().defaultRandom(),
-    roomId: text('room_id').notNull().references(() => rooms.id),
-    dayOfWeek: text('day_of_week').notNull(),
-    startTime: text('start_time').notNull(),
-    endTime: text('end_time').notNull(),
-    courseName: text('course_name'),
-    semester: text('semester').notNull(),
-    updatedAt: timestamp('updated_at').defaultNow(),
-});
+export const scheduleEntries = pgTable(
+  "schedule_entries",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+
+    roomId: text("room_id")
+      .notNull()
+      .references(() => rooms.id),
+
+    dayOfWeek: text("day_of_week").notNull(),
+    startTime: text("start_time").notNull(),
+    endTime: text("end_time").notNull(),
+    courseName: text("course_name").notNull(),
+    semester: text("semester").notNull(),
+    //updatedAt: timestamp('updated_at').defaultNow(),
+  },
+  (table) => ({
+    scheduleEntryUnique: uniqueIndex("schedule_entry_unique_idx").on(
+      table.roomId,
+      table.dayOfWeek,
+      table.startTime,
+      table.endTime,
+      table.courseName,
+      table.semester,
+      //table.updatedAt,
+    ),
+  }),
+);
 
 // Define relationships
 export const buildingsRelations = relations(buildings, ({ many }) => ({
