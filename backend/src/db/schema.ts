@@ -1,4 +1,4 @@
-import { pgTable, text, integer, real, uuid, timestamp } from 'drizzle-orm/pg-core';
+import { pgTable, text, integer, real, uuid, timestamp, boolean, jsonb } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
 export const buildings = pgTable('buildings', {
@@ -47,3 +47,106 @@ export const scheduleEntriesRelations = relations(scheduleEntries, ({ one }) => 
         references: [rooms.id],
     }),
 }));
+
+export const campusGraphVersions = pgTable("campus_graph_versions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+
+  campusId: text("campus_id").notNull().default("cpp"),
+  source: text("source").notNull().default("openstreetmap"),
+  osmRelationId: text("osm_relation_id").notNull(),
+
+  status: text("status").notNull().default("pending"),
+  // pending | active | failed | archived
+
+  fetchedAt: timestamp("fetched_at").defaultNow(),
+  activatedAt: timestamp("activated_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const campusGraphNodes = pgTable("campus_graph_nodes", {
+  id: uuid("id").primaryKey().defaultRandom(),
+
+  graphVersionId: uuid("graph_version_id")
+    .notNull()
+    .references(() => campusGraphVersions.id),
+
+  osmNodeId: text("osm_node_id").notNull(),
+
+  lat: real("lat").notNull(),
+  lng: real("lng").notNull(),
+
+  type: text("type").notNull().default("path_node"),
+  label: text("label"),
+});
+
+export const campusGraphEdges = pgTable("campus_graph_edges", {
+  id: uuid("id").primaryKey().defaultRandom(),
+
+  graphVersionId: uuid("graph_version_id")
+    .notNull()
+    .references(() => campusGraphVersions.id),
+
+  fromNodeId: uuid("from_node_id")
+    .notNull()
+    .references(() => campusGraphNodes.id),
+
+  toNodeId: uuid("to_node_id")
+    .notNull()
+    .references(() => campusGraphNodes.id),
+
+  distanceMeters: real("distance_meters").notNull(),
+  walkTimeSeconds: integer("walk_time_seconds").notNull(),
+
+  highwayType: text("highway_type"),
+  surface: text("surface"),
+  incline: text("incline"),
+
+  isStairs: boolean("is_stairs").notNull().default(false),
+  accessibilityPenalty: real("accessibility_penalty").notNull().default(0),
+
+  geometry: jsonb("geometry").notNull(),
+});
+
+export const campusGraphVersionsRelations = relations(
+  campusGraphVersions,
+  ({ many }) => ({
+    nodes: many(campusGraphNodes),
+    edges: many(campusGraphEdges),
+  }),
+);
+
+export const campusGraphNodesRelations = relations(
+  campusGraphNodes,
+  ({ one, many }) => ({
+    graphVersion: one(campusGraphVersions, {
+      fields: [campusGraphNodes.graphVersionId],
+      references: [campusGraphVersions.id],
+    }),
+    outgoingEdges: many(campusGraphEdges, {
+      relationName: "fromNode",
+    }),
+    incomingEdges: many(campusGraphEdges, {
+      relationName: "toNode",
+    }),
+  }),
+);
+
+export const campusGraphEdgesRelations = relations(
+  campusGraphEdges,
+  ({ one }) => ({
+    graphVersion: one(campusGraphVersions, {
+      fields: [campusGraphEdges.graphVersionId],
+      references: [campusGraphVersions.id],
+    }),
+    fromNode: one(campusGraphNodes, {
+      fields: [campusGraphEdges.fromNodeId],
+      references: [campusGraphNodes.id],
+      relationName: "fromNode",
+    }),
+    toNode: one(campusGraphNodes, {
+      fields: [campusGraphEdges.toNodeId],
+      references: [campusGraphNodes.id],
+      relationName: "toNode",
+    }),
+  }),
+);
