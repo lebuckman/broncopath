@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { View, Text, ActivityIndicator, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams } from "expo-router";
@@ -11,6 +11,7 @@ import { useFavorites } from "../../hooks/useFavorites";
 import { getRooms } from "../../lib/api";
 import { getCachedBuildings, getCachedRooms } from "../../lib/dataCache";
 import { applyRoomFilters, type FilterMode } from "../../lib/roomFilters";
+import { groupBuildings } from "../../lib/buildingGroups";
 import { CPP_REGION } from "../../constants/campus";
 import BuildingMarker from "../../components/map/BuildingMarker";
 import MapLegend from "../../components/map/MapLegend";
@@ -18,7 +19,7 @@ import BuildingDetailSheet from "../../components/building/BuildingDetailSheet";
 import GroupedChipFilter from "../../components/ui/GroupedChipFilter";
 
 export default function MapScreen() {
-  const { recenterMap } = useLocalSearchParams<{ recenterMap?: string }>();
+  const { recenterMap, focusBuildingId } = useLocalSearchParams<{ recenterMap?: string; focusBuildingId?: string }>();
   const mapRef = useRef<MapView>(null);
   const { buildings, loading } = useBuildings();
   const { favorites } = useFavorites();
@@ -40,6 +41,24 @@ export default function MapScreen() {
   }, [recenterMap]);
 
   const buildingIds = buildings.map((b) => b.id).join(",");
+
+  const buildingGroups = useMemo(
+    () => groupBuildings(buildings.filter((b) => b.id !== "999")),
+    [buildings],
+  );
+
+  useEffect(() => {
+    if (!focusBuildingId || !buildingGroups.length) return;
+    const group = buildingGroups.find((g) => g.allIds.includes(focusBuildingId));
+    if (!group) return;
+    const { primary } = group;
+    mapRef.current?.animateToRegion(
+      { latitude: primary.latitude, longitude: primary.longitude, latitudeDelta: 0.004, longitudeDelta: 0.004 },
+      600,
+    );
+    setSelected(primary);
+    setSheetVisible(true);
+  }, [focusBuildingId, buildingGroups]);
 
   useEffect(() => {
     if (!buildingIds) return;
@@ -67,14 +86,25 @@ export default function MapScreen() {
 
   const favoriteIds = favorites.map((f) => f.roomId);
 
-  const visibleBuildings = buildings.filter((b) => {
-    if (activeFilters.length === 0) return true;
-    const rooms = roomsMap[b.id];
-    if (!rooms) return true;
-    return rooms.some((r) =>
-      applyRoomFilters(r, activeFilters, filterMode, favoriteIds),
-    );
-  });
+  const visibleGroups = useMemo(
+    () =>
+      buildingGroups.filter((group) => {
+        const groupRooms = group.allIds.flatMap((id) => roomsMap[id] ?? []);
+        if (groupRooms.length === 0) return false;
+        if (activeFilters.length === 0) return true;
+        return groupRooms.some((r) =>
+          applyRoomFilters(r, activeFilters, filterMode, favoriteIds),
+        );
+      }),
+    [buildingGroups, roomsMap, activeFilters, filterMode, favoriteIds],
+  );
+
+  const selectedGroupRooms = useMemo(() => {
+    if (!selected) return undefined;
+    const group = buildingGroups.find((g) => g.primary.id === selected.id);
+    if (!group || group.aliases.length === 0) return undefined;
+    return group.allIds.flatMap((id) => roomsMap[id] ?? []);
+  }, [selected, buildingGroups, roomsMap]);
 
   function handleMarkerPress(building: Building) {
     setSelected(building);
@@ -204,10 +234,10 @@ export default function MapScreen() {
               showsCompass={false}
               toolbarEnabled={false}
             >
-              {visibleBuildings.map((building) => (
+              {visibleGroups.map((group) => (
                 <BuildingMarker
-                  key={building.id}
-                  building={building}
+                  key={group.primary.id}
+                  building={group.primary}
                   onPress={handleMarkerPress}
                 />
               ))}
@@ -223,6 +253,7 @@ export default function MapScreen() {
         visible={sheetVisible}
         onClose={() => setSheetVisible(false)}
         activeFilters={activeFilters}
+        preloadedRooms={selectedGroupRooms}
       />
     </SafeAreaView>
   );

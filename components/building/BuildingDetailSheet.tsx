@@ -1,5 +1,7 @@
-import { Pressable, ScrollView, Share, View, Text } from "react-native";
+import { useState } from "react";
+import { Modal, Pressable, ScrollView, Share, View, Text } from "react-native";
 import { Feather } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Colors } from "../../constants/colors";
 import { Fonts } from "../../constants/fonts";
@@ -21,6 +23,7 @@ interface Props {
   onClose: () => void;
   activeFilters?: string[];
   filterRoomIds?: string[];
+  preloadedRooms?: Room[];
 }
 
 function roomBadgeLabel(room: Room): string | undefined {
@@ -48,22 +51,23 @@ export default function BuildingDetailSheet({
   onClose,
   activeFilters,
   filterRoomIds,
+  preloadedRooms,
 }: Props) {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { rooms: allRooms, loading: roomsLoading } = useRooms(
-    building?.id ?? "",
+  const { rooms: fetchedRooms, loading: roomsLoading } = useRooms(
+    preloadedRooms ? "" : (building?.id ?? ""),
   );
+  const allRooms = preloadedRooms ?? fetchedRooms;
   const { isFavorite, toggleFavorite, getFavoriteRoomIds } = useFavorites();
   const favoriteRoomIds = building ? getFavoriteRoomIds(building.id) : [];
+  const [dirModalVisible, setDirModalVisible] = useState(false);
 
   const rooms = (() => {
     let base = allRooms;
     if (filterRoomIds) {
-      // Home screen: show only the explicitly specified room IDs
       base = base.filter((r) => filterRoomIds.includes(r.id));
     } else if (activeFilters && activeFilters.length > 0) {
-      // Strip "Favorites" — the detail sheet always shows all rooms for context;
-      // favorites are surfaced by sorting rather than filtering
       const chipFilters = activeFilters.filter((f) => f !== "Favorites");
       if (chipFilters.length > 0) {
         base = base.filter((r) =>
@@ -71,7 +75,6 @@ export default function BuildingDetailSheet({
         );
       }
     }
-    // Favorites float to top, then alphabetical by room number
     return base.slice().sort((a, b) => {
       const aFav = isFavorite(a.id) ? 0 : 1;
       const bFav = isFavorite(b.id) ? 0 : 1;
@@ -100,6 +103,23 @@ export default function BuildingDetailSheet({
     }
   }
 
+  function handleDirections(type: "from" | "to") {
+    if (!building) return;
+    setDirModalVisible(false);
+    onClose();
+    router.push({
+      pathname: "/(tabs)/route",
+      params: type === "from" ? { fromId: building.id } : { toId: building.id },
+    });
+  }
+
+  function handleViewOnMap() {
+    if (!building) return;
+    setDirModalVisible(false);
+    onClose();
+    router.push({ pathname: "/(tabs)/map", params: { focusBuildingId: building.id } });
+  }
+
   return (
     <BottomSheet visible={visible} onClose={onClose}>
       {building && (
@@ -109,12 +129,17 @@ export default function BuildingDetailSheet({
             className="px-5 pt-3 pb-4"
             style={{ borderBottomColor: Colors.border, borderBottomWidth: 1 }}
           >
-            <Text
-              className="text-[22px] mb-1"
-              style={{ color: Colors.text, fontFamily: Fonts.display }}
-            >
-              {building.name}
-            </Text>
+            <View style={{ flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 4 }}>
+              <Text
+                className="text-[22px] flex-1 mr-3"
+                style={{ color: Colors.text, fontFamily: Fonts.display }}
+              >
+                {building.name}
+              </Text>
+              <Pressable onPress={() => setDirModalVisible(true)} hitSlop={8} style={{ marginTop: 4 }}>
+                <Feather name="navigation" size={16} color={Colors.accent} />
+              </Pressable>
+            </View>
 
             <View className="flex-row items-center gap-2 mb-4">
               <DensityDot level={building.level} />
@@ -241,6 +266,102 @@ export default function BuildingDetailSheet({
           </View>
         </View>
       )}
+
+      {/* Directions from/to modal */}
+      <Modal
+        visible={dirModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setDirModalVisible(false)}
+        statusBarTranslucent
+      >
+        <Pressable
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.55)",
+            justifyContent: "center",
+            paddingHorizontal: 48,
+          }}
+          onPress={() => setDirModalVisible(false)}
+        >
+          <Pressable
+            onPress={() => {}}
+            style={{
+              backgroundColor: Colors.card,
+              borderRadius: 16,
+              borderWidth: 1,
+              borderColor: Colors.borderMd,
+              overflow: "hidden",
+            }}
+          >
+            <Text
+              style={{
+                color: Colors.muted,
+                fontFamily: Fonts.bodySemiBold,
+                fontSize: 11,
+                letterSpacing: 1,
+                paddingHorizontal: 20,
+                paddingTop: 16,
+                paddingBottom: 12,
+                textTransform: "uppercase",
+                borderBottomWidth: 1,
+                borderBottomColor: Colors.border,
+              }}
+            >
+              Directions
+            </Text>
+            <Pressable
+              onPress={() => handleDirections("from")}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 10,
+                paddingHorizontal: 20,
+                paddingVertical: 16,
+                borderBottomWidth: 1,
+                borderBottomColor: Colors.border,
+              }}
+            >
+              <Feather name="log-out" size={15} color={Colors.accent} />
+              <Text style={{ color: Colors.text, fontFamily: Fonts.bodyMedium, fontSize: 14 }}>
+                Route from here
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => handleDirections("to")}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 10,
+                paddingHorizontal: 20,
+                paddingVertical: 16,
+                borderBottomWidth: 1,
+                borderBottomColor: Colors.border,
+              }}
+            >
+              <Feather name="log-in" size={15} color={Colors.accent} />
+              <Text style={{ color: Colors.text, fontFamily: Fonts.bodyMedium, fontSize: 14 }}>
+                Route to here
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={handleViewOnMap}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 10,
+                paddingHorizontal: 20,
+                paddingVertical: 16,
+              }}
+            >
+              <Feather name="map-pin" size={15} color={Colors.accent} />
+              <Text style={{ color: Colors.text, fontFamily: Fonts.bodyMedium, fontSize: 14 }}>
+                View on map
+              </Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </BottomSheet>
   );
 }

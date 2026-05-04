@@ -18,6 +18,7 @@ import type { Room } from "../../constants/mockData";
 import { useBuildings } from "../../hooks/useBuildings";
 import { useFavorites } from "../../hooks/useFavorites";
 import { getRooms } from "../../lib/api";
+import { groupBuildings } from "../../lib/buildingGroups";
 import { getCachedBuildings, getCachedRooms } from "../../lib/dataCache";
 import { applyRoomFilters, type FilterMode } from "../../lib/roomFilters";
 import BuildingAccordion from "../../components/building/BuildingAccordion";
@@ -97,10 +98,15 @@ export default function RoomsScreen() {
 
   const trimmed = query.trim().toLowerCase();
 
+  const buildingGroups = useMemo(
+    () => groupBuildings(buildings.filter((b) => b.id !== "999")),
+    [buildings],
+  );
+
   const filteredBuildings = useMemo(() => {
-    return buildings
-      .map((b) => {
-        const allRooms = roomsMap[b.id] ?? [];
+    return buildingGroups
+      .map((group) => {
+        const allRooms = group.allIds.flatMap((id) => roomsMap[id] ?? []);
 
         const chipFiltered =
           activeFilters.length === 0
@@ -113,9 +119,11 @@ export default function RoomsScreen() {
         if (trimmed === "") {
           rooms = chipFiltered;
         } else if (searchMode === "buildings") {
-          const buildingMatches =
-            b.name.toLowerCase().includes(trimmed) ||
-            b.code.toLowerCase().includes(trimmed);
+          const buildingMatches = [group.primary, ...group.aliases].some(
+            (b) =>
+              b.name.toLowerCase().includes(trimmed) ||
+              b.code.toLowerCase().includes(trimmed),
+          );
           rooms = buildingMatches ? chipFiltered : [];
         } else {
           rooms = chipFiltered.filter(
@@ -132,7 +140,7 @@ export default function RoomsScreen() {
           );
 
         return {
-          ...b,
+          ...group.primary,
           rooms: sortedRooms,
           freeCount: sortedRooms.filter((r: Room) => r.status === "free")
             .length,
@@ -146,7 +154,7 @@ export default function RoomsScreen() {
         return a.code.localeCompare(b.code);
       });
   }, [
-    buildings,
+    buildingGroups,
     roomsMap,
     activeFilters,
     filterMode,

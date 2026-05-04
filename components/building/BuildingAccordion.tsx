@@ -1,6 +1,7 @@
 import { useState } from "react";
 import {
   LayoutAnimation,
+  Modal,
   Platform,
   UIManager,
   Pressable,
@@ -9,6 +10,7 @@ import {
   Text,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import { Colors } from "../../constants/colors";
 import { Fonts } from "../../constants/fonts";
 import type { Room } from "../../constants/mockData";
@@ -41,7 +43,9 @@ export default function BuildingAccordion({
   rooms,
   forceExpanded,
 }: Props) {
+  const router = useRouter();
   const [expanded, setExpanded] = useState(false);
+  const [dirModalVisible, setDirModalVisible] = useState(false);
   const { isFavorite, toggleFavorite } = useFavorites();
   const isExpanded = expanded || !!forceExpanded;
 
@@ -68,6 +72,19 @@ export default function BuildingAccordion({
   function toggle() {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setExpanded((prev) => !prev);
+  }
+
+  function handleDirections(type: "from" | "to") {
+    setDirModalVisible(false);
+    router.push({
+      pathname: "/(tabs)/route",
+      params: type === "from" ? { fromId: buildingId } : { toId: buildingId },
+    });
+  }
+
+  function handleViewOnMap() {
+    setDirModalVisible(false);
+    router.push({ pathname: "/(tabs)/map", params: { focusBuildingId: buildingId } });
   }
 
   return (
@@ -107,6 +124,9 @@ export default function BuildingAccordion({
               </Text>
             </View>
           )}
+          <Pressable onPress={() => setDirModalVisible(true)} hitSlop={6}>
+            <Feather name="navigation" size={14} color={Colors.accent} />
+          </Pressable>
           <Feather
             name={isExpanded ? "chevron-up" : "chevron-down"}
             size={16}
@@ -188,6 +208,102 @@ export default function BuildingAccordion({
           ))}
         </View>
       )}
+
+      {/* Directions from/to modal */}
+      <Modal
+        visible={dirModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setDirModalVisible(false)}
+        statusBarTranslucent
+      >
+        <Pressable
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.55)",
+            justifyContent: "center",
+            paddingHorizontal: 48,
+          }}
+          onPress={() => setDirModalVisible(false)}
+        >
+          <Pressable
+            onPress={() => {}}
+            style={{
+              backgroundColor: Colors.card,
+              borderRadius: 16,
+              borderWidth: 1,
+              borderColor: Colors.borderMd,
+              overflow: "hidden",
+            }}
+          >
+            <Text
+              style={{
+                color: Colors.muted,
+                fontFamily: Fonts.bodySemiBold,
+                fontSize: 11,
+                letterSpacing: 1,
+                paddingHorizontal: 20,
+                paddingTop: 16,
+                paddingBottom: 12,
+                textTransform: "uppercase",
+                borderBottomWidth: 1,
+                borderBottomColor: Colors.border,
+              }}
+            >
+              Directions
+            </Text>
+            <Pressable
+              onPress={() => handleDirections("from")}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 10,
+                paddingHorizontal: 20,
+                paddingVertical: 16,
+                borderBottomWidth: 1,
+                borderBottomColor: Colors.border,
+              }}
+            >
+              <Feather name="log-out" size={15} color={Colors.accent} />
+              <Text style={{ color: Colors.text, fontFamily: Fonts.bodyMedium, fontSize: 14 }}>
+                Route from here
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => handleDirections("to")}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 10,
+                paddingHorizontal: 20,
+                paddingVertical: 16,
+                borderBottomWidth: 1,
+                borderBottomColor: Colors.border,
+              }}
+            >
+              <Feather name="log-in" size={15} color={Colors.accent} />
+              <Text style={{ color: Colors.text, fontFamily: Fonts.bodyMedium, fontSize: 14 }}>
+                Route to here
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={handleViewOnMap}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 10,
+                paddingHorizontal: 20,
+                paddingVertical: 16,
+              }}
+            >
+              <Feather name="map-pin" size={15} color={Colors.accent} />
+              <Text style={{ color: Colors.text, fontFamily: Fonts.bodyMedium, fontSize: 14 }}>
+                View on map
+              </Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }

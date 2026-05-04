@@ -219,7 +219,7 @@ export default function HomeScreen() {
               className="text-[11px]"
               style={{ color: Colors.muted, fontFamily: Fonts.body }}
             >
-              Avoid the crowds
+              Get directions
             </Text>
           </Pressable>
         </View>

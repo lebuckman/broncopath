@@ -24,6 +24,6 @@
     "dev": "npx tsx --watch src/index.ts",
     "build": "tsc",
     "db:push": "drizzle-kit push",
-    "db:seed": "ts-node src/db/seed.ts"
+    "db:seed": "npx tsx src/db/seed.ts"
   }
 }
