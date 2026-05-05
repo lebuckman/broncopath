@@ -21,6 +21,7 @@ interface Props {
   onClose: () => void;
   activeFilters?: string[];
   filterRoomIds?: string[];
+  preloadedRooms?: Room[];
 }
 
 function roomBadgeLabel(room: Room): string | undefined {
@@ -48,11 +49,13 @@ export default function BuildingDetailSheet({
   onClose,
   activeFilters,
   filterRoomIds,
+  preloadedRooms,
 }: Props) {
   const insets = useSafeAreaInsets();
-  const { rooms: allRooms, loading: roomsLoading } = useRooms(
-    building?.id ?? "",
+  const { rooms: fetchedRooms, loading: roomsLoading } = useRooms(
+    preloadedRooms ? "" : (building?.id ?? ""),
   );
+  const allRooms = preloadedRooms ?? fetchedRooms;
   const { isFavorite, toggleFavorite, getFavoriteRoomIds } = useFavorites();
   const favoriteRoomIds = building ? getFavoriteRoomIds(building.id) : [];
 

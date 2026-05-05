@@ -13,6 +13,7 @@ import { useCampusGraph } from "../../hooks/useCampusGraph";
 import { getRooms } from "../../lib/api";
 import { getCachedBuildings, getCachedRooms } from "../../lib/dataCache";
 import { applyRoomFilters, type FilterMode } from "../../lib/roomFilters";
+import { groupBuildings } from "../../lib/buildingGroups";
 import { CPP_REGION } from "../../constants/campus";
 import MapLegend from "../../components/map/MapLegend";
 import RoutePlannerSheet from "../../components/map/RoutePlannerSheet";
@@ -170,16 +171,27 @@ export default function MapScreen() {
 
   const favoriteIds = favorites.map((favorite) => favorite.roomId);
 
-  const visibleBuildings = buildings.filter((building) => {
-    if (activeFilters.length === 0) return true;
+  const buildingGroups = useMemo(() => groupBuildings(buildings), [buildings]);
 
-    const rooms = roomsMap[building.id];
-    if (!rooms) return true;
-
-    return rooms.some((room) =>
-      applyRoomFilters(room, activeFilters, filterMode, favoriteIds),
+  const visibleGroups = useMemo(() => {
+    if (activeFilters.length === 0) return buildingGroups;
+    return buildingGroups.filter((group) =>
+      group.allIds.some((id) => {
+        const rooms = roomsMap[id];
+        if (!rooms) return true;
+        return rooms.some((room) =>
+          applyRoomFilters(room, activeFilters, filterMode, favoriteIds),
+        );
+      }),
     );
-  });
+  }, [buildingGroups, roomsMap, activeFilters, filterMode, favoriteIds]);
+
+  const selectedGroupRooms = useMemo(() => {
+    if (!selected) return undefined;
+    const group = buildingGroups.find((g) => g.primary.id === selected.id);
+    if (!group || group.allIds.length === 1) return undefined;
+    return group.allIds.flatMap((id) => roomsMap[id] ?? []);
+  }, [selected, buildingGroups, roomsMap]);
 
   function handleMarkerPress(building: Building) {
     setSelected(building);
@@ -304,9 +316,26 @@ export default function MapScreen() {
                 </MLRN.GeoJSONSource>
               )}
 
-              {visibleBuildings.map((building) => {
+              {visibleGroups.map((group) => {
+                const building = group.primary;
                 const isStart = startBuilding?.id === building.id;
                 const isEnd = endBuilding?.id === building.id;
+                const isGrouped = group.allIds.length > 1;
+
+                let bg: string, border: string, dot: string;
+                if (isStart) {
+                  bg = "#3b82f6"; border = "#3b82f6"; dot = "#fff";
+                } else if (isEnd) {
+                  bg = "#ef4444"; border = "#ef4444"; dot = "#fff";
+                } else if (building.roomCount === 0) {
+                  bg = Colors.surface; border = Colors.borderMd; dot = Colors.muted;
+                } else if (building.level === "low") {
+                  bg = Colors.card; border = Colors.low; dot = Colors.low;
+                } else if (building.level === "med") {
+                  bg = Colors.card; border = Colors.med; dot = Colors.med;
+                } else {
+                  bg = Colors.card; border = Colors.high; dot = Colors.high;
+                }
 
                 return (
                   <MLRN.Marker
@@ -318,18 +347,25 @@ export default function MapScreen() {
                   >
                     <View
                       style={{
-                        backgroundColor: isStart
-                          ? "#3b82f6"
-                          : isEnd
-                            ? "#ef4444"
-                            : Colors.surface,
-                        borderColor: Colors.accent,
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 5,
+                        backgroundColor: bg,
+                        borderColor: border,
                         borderWidth: 1,
                         borderRadius: 20,
                         paddingHorizontal: 8,
                         paddingVertical: 5,
                       }}
                     >
+                      <View
+                        style={{
+                          width: 7,
+                          height: 7,
+                          borderRadius: 4,
+                          backgroundColor: dot,
+                        }}
+                      />
                       <Text
                         style={{
                           color: Colors.text,
@@ -338,6 +374,7 @@ export default function MapScreen() {
                         }}
                       >
                         {building.code}
+                        {isGrouped ? " +" : ""}
                       </Text>
                     </View>
                   </MLRN.Marker>
@@ -388,6 +425,7 @@ export default function MapScreen() {
         visible={sheetVisible}
         onClose={() => setSheetVisible(false)}
         activeFilters={activeFilters}
+        preloadedRooms={selectedGroupRooms}
       />
     </SafeAreaView>
   );
