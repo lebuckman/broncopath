@@ -344,9 +344,13 @@ export default function RoutePlannerSheet({
 
                 <Pressable
                     onPress={onGo}
+                    disabled={!onGo || !startBuilding || !endBuilding || !routeDistanceMeters}
                     style={{
                         borderRadius: 18,
-                        backgroundColor: Colors.accent,
+                        backgroundColor:
+                        !onGo || !startBuilding || !endBuilding || !routeDistanceMeters
+                            ? Colors.border
+                            : Colors.accent,
                         paddingHorizontal: 22,
                         paddingVertical: 12,
                     }}

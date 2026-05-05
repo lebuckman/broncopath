@@ -7,15 +7,51 @@ import type { Building, Room, RouteOption } from '../constants/mockData';
 const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://localhost:3000';
 
 export async function getBuildings(): Promise<Building[]> {
-  return fetch(`${BASE_URL}/api/buildings`).then(r => r.json());
+  const response = await fetch(`${BASE_URL}/api/buildings`);
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch buildings: ${response.status}`);
+  }
+
+  const data = await response.json();
+
+  if (!Array.isArray(data)) {
+    throw new Error("Invalid buildings response: expected array");
+  }
+
+  return data;
 }
 
 export async function getRooms(buildingId: string): Promise<Room[]> {
-  return fetch(`${BASE_URL}/api/buildings/${buildingId}/rooms`).then(r => r.json());
+  const response = await fetch(`${BASE_URL}/api/buildings/${buildingId}/rooms`);
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch rooms: ${response.status}`);
+  }
+
+  const data = await response.json();
+
+  if (!Array.isArray(data)) {
+    throw new Error("Invalid rooms response: expected array");
+  }
+
+  return data;
 }
 
 export async function getRoutes(from: string, to: string): Promise<RouteOption[]> {
-  return fetch(`${BASE_URL}/api/routes?from=${from}&to=${to}`).then(r => r.json());
+  const response = await fetch(`${BASE_URL}/api/routes?from=${from}&to=${to}`);
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch route: ${response.status}`);
+  }
+
+  const data = await response.json();
+
+  if (!Array.isArray(data)) {
+    throw new Error("Invalid routes response: expected array");
+  }
+
+  return data;
 }
 
 export async function getCampusGraph(): Promise<CampusGraphResponse> {

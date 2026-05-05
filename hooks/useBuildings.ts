@@ -13,7 +13,9 @@ export function useBuildings() {
   useEffect(() => {
     function fetchBuildings() {
       getBuildings()
-        .then(setBuildings)
+        .then((nextBuildings) => {
+          setBuildings(Array.isArray(nextBuildings) ? nextBuildings : []);
+        })
         .catch(setError)
         .finally(() => setLoading(false));
     }

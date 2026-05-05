@@ -34,8 +34,11 @@ export default function MapScreen() {
 
   const { buildings, loading } = useBuildings();
   const { favorites } = useFavorites();
-  const { graph, refreshing: graphRefreshing, error: graphError } =
-    useCampusGraph();
+  const {
+    graph,
+    refreshing: graphRefreshing,
+    error: graphError,
+  } = useCampusGraph();
 
   const [roomsMap, setRoomsMap] = useState<Record<string, Room[]>>(() => {
     const map: Record<string, Room[]> = {};
@@ -192,19 +195,37 @@ export default function MapScreen() {
   }
 
   function fitCameraToRoute() {
-   const coordinates = routeGeoJSON?.geometry?.coordinates;
+    const coordinates = routeGeoJSON?.geometry?.coordinates;
 
-    if (!coordinates || coordinates.length === 0) return;
+    if (!coordinates || coordinates.length === 0) {
+      console.log("No route coordinates to fit");
+      return;
+    }
 
     const lngs = coordinates.map((coord) => coord[0]);
     const lats = coordinates.map((coord) => coord[1]);
 
-    const center: [number, number] = [
-      (Math.min(...lngs) + Math.max(...lngs)) / 2,
-      (Math.min(...lats) + Math.max(...lats)) / 2,
-    ];
+    const minLng = Math.min(...lngs);
+    const maxLng = Math.max(...lngs);
+    const minLat = Math.min(...lats);
+    const maxLat = Math.max(...lats);
 
-    cameraRef.current?.flyTo(center, 900);
+    const lngCenter = (minLng + maxLng) / 2;
+    const latCenter = (minLat + maxLat) / 2;
+    // calculate zoomCenter var based on the "box" that contains the route, so that it fits nicely on screen with some padding
+    const routeWidth = maxLng - minLng;
+    const routeHeight = maxLat - minLat;
+    const maxRouteDimension = Math.max(routeWidth, routeHeight);
+    const zoomCenter = Math.floor(
+      Math.log2(360 / (maxRouteDimension * 1.5)) - 1); // 1.5 is padding factor
+
+    cameraRef.current?.flyTo({
+      center: [lngCenter, latCenter],
+      zoom: zoomCenter,
+      duration: 500,
+    });
+
+    setRouteSheetExpanded(false);
   }
 
   return (

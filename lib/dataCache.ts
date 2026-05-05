@@ -15,7 +15,8 @@ export const isBuildingsCached = (): boolean => _buildings.length > 0;
 export const isRoomsCached = (id: string): boolean => id in _rooms;
 
 export async function prefetchBuildings(): Promise<void> {
-  _buildings = await getBuildings();
+  const buildings = await getBuildings();
+  _buildings = Array.isArray(buildings) ? buildings : [];
 }
 
 export async function prefetchRooms(): Promise<void> {

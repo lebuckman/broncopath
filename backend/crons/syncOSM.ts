@@ -1,12 +1,12 @@
 import "dotenv/config";
 import { eq } from "drizzle-orm";
-import { db } from "../db/index.ts";
+import { db } from "../src/db/index.ts";
 import {
   buildings,
   campusGraphEdges,
   campusGraphNodes,
   campusGraphVersions,
-} from "../db/schema.ts";
+} from "../src/db/schema.ts";
 
 const CPP_RELATION_ID = 11352841;
 const OVERPASS_URL = "https://overpass-api.de/api/interpreter";
@@ -175,7 +175,7 @@ function findBuildingWay(
   });
 
   if (exactNumberMatches.length === 1) {
-    return exactNumberMatches[0];
+    return exactNumberMatches[0] ?? null;
   }
 
   if (exactNumberMatches.length > 1) {
@@ -191,7 +191,7 @@ function findBuildingWay(
       );
 
       return Number(bExact) - Number(aExact);
-    })[0];
+    })[0] ?? null;
   }
 
   if (building.id === "1") {
@@ -221,7 +221,7 @@ function findBuildingWay(
       const aAreaScore = wayCoords(a, nodesById).length;
       const bAreaScore = wayCoords(b, nodesById).length;
       return bAreaScore - aAreaScore;
-    })[0];
+    })[0] ?? null;
   }
 
   const buildingName = normalizeText(building.name);
@@ -357,7 +357,6 @@ async function main() {
     }
   }
 
-  console.log(`Created missing buildings from OSM: ${createdCount}`);
 
   console.log(`Created missing buildings from OSM: ${createdCount}`);
 
@@ -417,8 +416,8 @@ async function main() {
     const isStairs = highwayType === "steps";
 
     for (let i = 0; i < nodeIds.length - 1; i++) {
-      const fromOsmId = nodeIds[i];
-      const toOsmId = nodeIds[i + 1];
+      const fromOsmId = nodeIds[i]!;
+      const toOsmId = nodeIds[i + 1]!;
 
       const fromNode = nodesById.get(fromOsmId);
       const toNode = nodesById.get(toOsmId);

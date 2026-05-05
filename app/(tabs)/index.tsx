@@ -39,7 +39,7 @@ export default function HomeScreen() {
     useState<Building | null>(null);
   const [showInfo, setShowInfo] = useState(false);
 
-  const favoriteBuildings = buildings.filter((b) =>
+  const favoriteBuildings = buildings?.filter((b) =>
     favoriteBuildingIds.includes(b.id),
   );
 
