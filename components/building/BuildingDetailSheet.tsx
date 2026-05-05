@@ -298,34 +298,37 @@ export default function BuildingDetailSheet({
                       sections.map((section, si) => {
                         const sectionRooms = filterAndSortRooms(section.rooms);
                         const hasDbRooms = section.rooms.length > 0;
+                        const sectionHeader = (
+                          <View
+                            style={{
+                              paddingTop: si === 0 ? 0 : 16,
+                              paddingBottom: 4,
+                              borderTopWidth: si === 0 ? 0 : 1,
+                              borderTopColor: Colors.border,
+                            }}
+                          >
+                            <Text
+                              style={{
+                                color: Colors.muted,
+                                fontSize: 11,
+                                fontFamily: Fonts.bodySemiBold,
+                                letterSpacing: 0.4,
+                              }}
+                            >
+                              {section.building.code}
+                            </Text>
+                          </View>
+                        );
                         if (!hasDbRooms) {
                           return (
                             <View key={section.building.id}>
-                              <View
-                                style={{
-                                  paddingTop: si === 0 ? 0 : 12,
-                                  paddingBottom: 6,
-                                  borderTopWidth: si === 0 ? 0 : 1,
-                                  borderTopColor: Colors.border,
-                                }}
-                              >
-                                <Text
-                                  style={{
-                                    color: Colors.muted,
-                                    fontSize: 10,
-                                    fontFamily: Fonts.bodySemiBold,
-                                    letterSpacing: 0.5,
-                                  }}
-                                >
-                                  {section.building.code}
-                                </Text>
-                              </View>
+                              {sectionHeader}
                               <View
                                 style={{
                                   flexDirection: "row",
                                   alignItems: "center",
                                   gap: 6,
-                                  paddingBottom: 8,
+                                  paddingBottom: 10,
                                 }}
                               >
                                 <Feather
@@ -349,31 +352,9 @@ export default function BuildingDetailSheet({
                         if (sectionRooms.length === 0) return null;
                         return (
                           <View key={section.building.id}>
-                            <View
-                              style={{
-                                paddingTop: si === 0 ? 0 : 12,
-                                paddingBottom: 6,
-                                borderTopWidth: si === 0 ? 0 : 1,
-                                borderTopColor: Colors.border,
-                              }}
-                            >
-                              <Text
-                                style={{
-                                  color: Colors.muted,
-                                  fontSize: 10,
-                                  fontFamily: Fonts.bodySemiBold,
-                                  letterSpacing: 0.5,
-                                }}
-                              >
-                                {section.building.code}
-                              </Text>
-                            </View>
-                            {sectionRooms.map((room, i) =>
-                              renderRoomRow(
-                                room,
-                                i === sectionRooms.length - 1,
-                                section.building,
-                              ),
+                            {sectionHeader}
+                            {sectionRooms.map((room) =>
+                              renderRoomRow(room, true, section.building),
                             )}
                           </View>
                         );

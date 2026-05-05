@@ -20,7 +20,7 @@ import { useFavorites } from "../../hooks/useFavorites";
 import { getRooms } from "../../lib/api";
 import { getCachedBuildings, getCachedRooms } from "../../lib/dataCache";
 import { applyRoomFilters, type FilterMode } from "../../lib/roomFilters";
-import { groupBuildings } from "../../lib/buildingGroups";
+import { groupBuildingsByComplex } from "../../lib/buildingGroups";
 import type { BuildingSection } from "../../lib/buildingGroups";
 import BuildingAccordion from "../../components/building/BuildingAccordion";
 import BuildingAccordionSkeleton from "../../components/building/BuildingAccordionSkeleton";
@@ -99,7 +99,7 @@ export default function RoomsScreen() {
 
   const trimmed = query.trim().toLowerCase();
 
-  const buildingGroups = useMemo(() => groupBuildings(buildings), [buildings]);
+  const buildingGroups = useMemo(() => groupBuildingsByComplex(buildings), [buildings]);
 
   const filteredBuildings = useMemo(() => {
     const allGroupBuildings = (group: (typeof buildingGroups)[number]) => [

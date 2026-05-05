@@ -131,9 +131,9 @@ export default function BuildingAccordion({
             sections.map((section, si) => (
               <View key={section.building.id}>
                 <View
+                  className="px-5"
                   style={{
-                    paddingHorizontal: 20,
-                    paddingTop: si === 0 ? 8 : 12,
+                    paddingTop: si === 0 ? 14 : 16,
                     paddingBottom: 4,
                     borderTopWidth: si === 0 ? 0 : 1,
                     borderTopColor: Colors.border,
@@ -142,26 +142,18 @@ export default function BuildingAccordion({
                   <Text
                     style={{
                       color: Colors.muted,
-                      fontSize: 10,
+                      fontSize: 11,
                       fontFamily: Fonts.bodySemiBold,
-                      letterSpacing: 0.5,
+                      letterSpacing: 0.4,
                     }}
                   >
                     {section.building.code}
                   </Text>
                 </View>
-                {section.rooms.map((room, i) => (
+                {section.rooms.map((room) => (
                   <View
                     key={room.id}
                     className="flex-row items-center justify-between px-5 py-3"
-                    style={
-                      i < section.rooms.length - 1
-                        ? {
-                            borderBottomColor: Colors.border,
-                            borderBottomWidth: 1,
-                          }
-                        : undefined
-                    }
                   >
                     <View className="flex-1 mr-3">
                       <Text
