@@ -337,6 +337,8 @@ export default function MapScreen() {
                   bg = Colors.card; border = Colors.high; dot = Colors.high;
                 }
 
+                const noRooms = building.roomCount === 0;
+
                 return (
                   <MLRN.Marker
                     key={building.id}
@@ -349,20 +351,20 @@ export default function MapScreen() {
                       style={{
                         flexDirection: "row",
                         alignItems: "center",
-                        gap: 5,
+                        gap: 4,
                         backgroundColor: bg,
                         borderColor: border,
                         borderWidth: 1,
                         borderRadius: 20,
-                        paddingHorizontal: 8,
-                        paddingVertical: 5,
+                        paddingHorizontal: noRooms ? 6 : 7,
+                        paddingVertical: noRooms ? 3 : 4,
                       }}
                     >
                       <View
                         style={{
-                          width: 7,
-                          height: 7,
-                          borderRadius: 4,
+                          width: noRooms ? 5 : 6,
+                          height: noRooms ? 5 : 6,
+                          borderRadius: 3,
                           backgroundColor: dot,
                         }}
                       />
@@ -370,7 +372,7 @@ export default function MapScreen() {
                         style={{
                           color: Colors.text,
                           fontFamily: Fonts.bodySemiBold,
-                          fontSize: 11,
+                          fontSize: noRooms ? 10 : 11,
                         }}
                       >
                         {building.code}
