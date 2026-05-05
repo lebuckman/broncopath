@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { View, Text, ActivityIndicator, Pressable } from "react-native";
+import { Feather } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams } from "expo-router";
 import * as MLRN from "@maplibre/maplibre-react-native";
@@ -69,6 +70,13 @@ export default function MapScreen() {
 
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
   const [filterMode, setFilterMode] = useState<FilterMode>("any");
+
+  const routeMinutes =
+    routeWalkTimeSeconds != null
+      ? Math.max(1, Math.round(routeWalkTimeSeconds / 60))
+      : null;
+  const routeMeters =
+    routeDistanceMeters != null ? Math.round(routeDistanceMeters) : null;
 
   const routingGraph = useMemo(() => {
     if (!graph) return null;
@@ -212,15 +220,10 @@ export default function MapScreen() {
 
   function fitCameraToRoute() {
     const coordinates = routeGeoJSON?.geometry?.coordinates;
+    if (!coordinates || coordinates.length === 0) return;
 
-    if (!coordinates || coordinates.length === 0) {
-      console.log("No route coordinates to fit");
-      return;
-    }
-
-    const lngs = coordinates.map((coord) => coord[0]);
-    const lats = coordinates.map((coord) => coord[1]);
-
+    const lngs = coordinates.map((c) => c[0]);
+    const lats = coordinates.map((c) => c[1]);
     const minLng = Math.min(...lngs);
     const maxLng = Math.max(...lngs);
     const minLat = Math.min(...lats);
@@ -228,19 +231,26 @@ export default function MapScreen() {
 
     const lngCenter = (minLng + maxLng) / 2;
     const latCenter = (minLat + maxLat) / 2;
-    // calculate zoomCenter var based on the "box" that contains the route, so that it fits nicely on screen with some padding
-    const routeWidth = maxLng - minLng;
-    const routeHeight = maxLat - minLat;
-    const maxRouteDimension = Math.max(routeWidth, routeHeight);
-    const zoomCenter = Math.floor(
-      Math.log2(360 / (maxRouteDimension * 1.5)) - 1); // 1.5 is padding factor
+    const maxDim = Math.max(maxLng - minLng, maxLat - minLat);
+    // Clamp zoom: log2 formula calibrated for campus-scale routes → 15–17
+    const rawZoom = Math.log2(360 / (maxDim * 2));
+    const zoom = Math.min(17, Math.max(15, rawZoom));
 
     cameraRef.current?.flyTo({
       center: [lngCenter, latCenter],
-      zoom: zoomCenter,
+      zoom,
       duration: 500,
     });
 
+    setRouteSheetExpanded(false);
+  }
+
+  function handleLocateBuilding(building: Building) {
+    cameraRef.current?.flyTo({
+      center: [building.longitude, building.latitude],
+      zoom: 17,
+      duration: 500,
+    });
     setRouteSheetExpanded(false);
   }
 
@@ -405,17 +415,84 @@ export default function MapScreen() {
               onFocusSearch={() => setRouteSheetExpanded(true)}
             />
 
+            {/* Legend — top right */}
             <View
               pointerEvents="box-none"
               style={{
                 position: "absolute",
-                top: 88,
+                top: 12,
                 right: 12,
                 zIndex: 10,
               }}
             >
               <MapLegend />
             </View>
+
+            {/* Active route pill — top left */}
+            {routeGeoJSON && (
+              <View
+                pointerEvents="box-none"
+                style={{
+                  position: "absolute",
+                  top: 12,
+                  left: 12,
+                  zIndex: 15,
+                }}
+              >
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    backgroundColor: "rgba(20,24,31,0.82)",
+                    borderColor: Colors.border,
+                    borderWidth: 1,
+                    borderRadius: 20,
+                    paddingHorizontal: 12,
+                    paddingVertical: 7,
+                    gap: 7,
+                  }}
+                >
+                  <View
+                    style={{
+                      width: 7,
+                      height: 7,
+                      borderRadius: 3.5,
+                      backgroundColor: Colors.accent,
+                    }}
+                  />
+                  <Text
+                    style={{
+                      color: Colors.text,
+                      fontFamily: Fonts.bodyMedium,
+                      fontSize: 12,
+                    }}
+                  >
+                    {routeMinutes != null ? `${routeMinutes} min` : "Route active"}
+                  </Text>
+                  {routeMeters != null && (
+                    <Text
+                      style={{
+                        color: Colors.muted,
+                        fontFamily: Fonts.body,
+                        fontSize: 12,
+                      }}
+                    >
+                      · {routeMeters} m
+                    </Text>
+                  )}
+                  <Pressable
+                    onPress={() => setRouteSheetExpanded(true)}
+                    style={{ marginLeft: 2 }}
+                    hitSlop={8}
+                  >
+                    <Feather name="edit-2" size={13} color={Colors.muted} />
+                  </Pressable>
+                  <Pressable onPress={clearRoute} hitSlop={8}>
+                    <Feather name="x" size={14} color={Colors.muted} />
+                  </Pressable>
+                </View>
+              </View>
+            )}
 
             <RoutePlannerSheet
               expanded={routeSheetExpanded}
@@ -429,6 +506,7 @@ export default function MapScreen() {
               onSelectEnd={setEndBuilding}
               onClearRoute={clearRoute}
               onGo={fitCameraToRoute}
+              onLocateBuilding={handleLocateBuilding}
             />
           </>
         )}

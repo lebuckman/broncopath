@@ -19,6 +19,7 @@ interface Props {
 }
 
 const SCREEN_W = Dimensions.get("window").width;
+const SCREEN_H = Dimensions.get("window").height;
 const DROPDOWN_W = 180;
 
 export default function GroupedChipFilter({
@@ -36,10 +37,13 @@ export default function GroupedChipFilter({
       setAnchor(null);
       return;
     }
+    const group = FILTER_GROUPS.find((g) => g.label === label);
+    const dropdownH = Math.min((group?.options.length ?? 4) * 46, 280);
     chipRefs.current[label]?.measureInWindow((x, y, _w, h) => {
+      const openUpward = y + h + 6 + dropdownH > SCREEN_H;
       setAnchor({
         x: Math.min(x, SCREEN_W - DROPDOWN_W - 8),
-        y: y + h + 6,
+        y: openUpward ? y - dropdownH - 6 : y + h + 6,
       });
       setOpenGroup(label);
     });
