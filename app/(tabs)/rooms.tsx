@@ -21,6 +21,7 @@ import { getRooms } from "../../lib/api";
 import { getCachedBuildings, getCachedRooms } from "../../lib/dataCache";
 import { applyRoomFilters, type FilterMode } from "../../lib/roomFilters";
 import { groupBuildings } from "../../lib/buildingGroups";
+import type { BuildingSection } from "../../lib/buildingGroups";
 import BuildingAccordion from "../../components/building/BuildingAccordion";
 import BuildingAccordionSkeleton from "../../components/building/BuildingAccordionSkeleton";
 import GroupedChipFilter from "../../components/ui/GroupedChipFilter";
@@ -101,48 +102,65 @@ export default function RoomsScreen() {
   const buildingGroups = useMemo(() => groupBuildings(buildings), [buildings]);
 
   const filteredBuildings = useMemo(() => {
+    const allGroupBuildings = (group: (typeof buildingGroups)[number]) => [
+      group.primary,
+      ...group.aliases,
+    ];
+
     return buildingGroups
       .map((group) => {
-        const allRooms = group.allIds.flatMap((id) => roomsMap[id] ?? []);
+        const groupBuilds = allGroupBuildings(group);
+        const buildingMatches =
+          searchMode === "buildings" && trimmed !== ""
+            ? groupBuilds.some(
+                (b) =>
+                  b.name.toLowerCase().includes(trimmed) ||
+                  b.code.toLowerCase().includes(trimmed),
+              )
+            : true;
 
-        const chipFiltered =
-          activeFilters.length === 0
-            ? allRooms
-            : allRooms.filter((r) =>
-                applyRoomFilters(r, activeFilters, filterMode, favoriteIds),
+        const sections: BuildingSection[] = groupBuilds
+          .map((b) => {
+            const bRooms = roomsMap[b.id] ?? [];
+            const chipFiltered =
+              activeFilters.length === 0
+                ? bRooms
+                : bRooms.filter((r) =>
+                    applyRoomFilters(r, activeFilters, filterMode, favoriteIds),
+                  );
+
+            let filtered: Room[];
+            if (trimmed === "") {
+              filtered = chipFiltered;
+            } else if (searchMode === "buildings") {
+              filtered = buildingMatches ? chipFiltered : [];
+            } else {
+              filtered = chipFiltered.filter(
+                (r) =>
+                  r.number.toLowerCase().includes(trimmed) ||
+                  r.type.toLowerCase().includes(trimmed),
+              );
+            }
+
+            const sortedRooms = filtered
+              .slice()
+              .sort((a, b) =>
+                (a.number ?? "").localeCompare(b.number ?? "", undefined, {
+                  numeric: true,
+                }),
               );
 
-        let rooms: Room[];
-        if (trimmed === "") {
-          rooms = chipFiltered;
-        } else if (searchMode === "buildings") {
-          const buildingMatches = [group.primary, ...group.aliases].some(
-            (b) =>
-              b.name.toLowerCase().includes(trimmed) ||
-              b.code.toLowerCase().includes(trimmed),
-          );
-          rooms = buildingMatches ? chipFiltered : [];
-        } else {
-          rooms = chipFiltered.filter(
-            (r) =>
-              r.number.toLowerCase().includes(trimmed) ||
-              r.type.toLowerCase().includes(trimmed),
-          );
-        }
+            return { building: b, rooms: sortedRooms };
+          })
+          .filter((s) => s.rooms.length > 0);
 
-        const sortedRooms = rooms
-          .slice()
-          .sort((a, b) =>
-            (a.number ?? "").localeCompare(b.number ?? "", undefined, {
-              numeric: true,
-            }),
-          );
+        const allRooms = sections.flatMap((s) => s.rooms);
 
         return {
           ...group.primary,
-          rooms: sortedRooms,
-          freeCount: sortedRooms.filter((r: Room) => r.status === "free")
-            .length,
+          rooms: allRooms,
+          freeCount: allRooms.filter((r: Room) => r.status === "free").length,
+          sections: sections.length > 1 ? sections : undefined,
         };
       })
       .filter((b) => b.rooms.length > 0)
@@ -174,6 +192,7 @@ export default function RoomsScreen() {
         code={b.code}
         freeCount={b.freeCount}
         rooms={b.rooms}
+        sections={b.sections}
         forceExpanded={
           (searchMode === "rooms" && trimmed.length > 0) ||
           activeFilters.includes("Favorites")

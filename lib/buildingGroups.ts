@@ -1,9 +1,14 @@
-import type { Building } from '../constants/mockData';
+import type { Building, Room } from '../constants/mockData';
 
 export interface BuildingGroup {
   primary: Building;
   aliases: Building[];
   allIds: string[];
+}
+
+export interface BuildingSection {
+  building: Building;
+  rooms: Room[];
 }
 
 function coordKey(b: Building): string {

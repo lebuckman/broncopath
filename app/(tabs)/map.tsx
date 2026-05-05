@@ -14,6 +14,7 @@ import { getRooms } from "../../lib/api";
 import { getCachedBuildings, getCachedRooms } from "../../lib/dataCache";
 import { applyRoomFilters, type FilterMode } from "../../lib/roomFilters";
 import { groupBuildings } from "../../lib/buildingGroups";
+import type { BuildingSection } from "../../lib/buildingGroups";
 import { CPP_REGION } from "../../constants/campus";
 import MapLegend from "../../components/map/MapLegend";
 import RoutePlannerSheet from "../../components/map/RoutePlannerSheet";
@@ -186,11 +187,14 @@ export default function MapScreen() {
     );
   }, [buildingGroups, roomsMap, activeFilters, filterMode, favoriteIds]);
 
-  const selectedGroupRooms = useMemo(() => {
+  const selectedGroupSections = useMemo((): BuildingSection[] | undefined => {
     if (!selected) return undefined;
     const group = buildingGroups.find((g) => g.primary.id === selected.id);
     if (!group || group.allIds.length === 1) return undefined;
-    return group.allIds.flatMap((id) => roomsMap[id] ?? []);
+    return [group.primary, ...group.aliases].map((b) => ({
+      building: b,
+      rooms: roomsMap[b.id] ?? [],
+    }));
   }, [selected, buildingGroups, roomsMap]);
 
   function handleMarkerPress(building: Building) {
@@ -322,22 +326,30 @@ export default function MapScreen() {
                 const isEnd = endBuilding?.id === building.id;
                 const isGrouped = group.allIds.length > 1;
 
+                const groupRoomCount = group.allIds.reduce((sum, id) => {
+                  const b = buildings.find((b) => b.id === id);
+                  return sum + (b?.roomCount ?? 0);
+                }, 0);
+                const representativeBuilding =
+                  [building, ...group.aliases].find((b) => b.roomCount > 0) ??
+                  building;
+
                 let bg: string, border: string, dot: string;
                 if (isStart) {
                   bg = "#3b82f6"; border = "#3b82f6"; dot = "#fff";
                 } else if (isEnd) {
                   bg = "#ef4444"; border = "#ef4444"; dot = "#fff";
-                } else if (building.roomCount === 0) {
+                } else if (groupRoomCount === 0) {
                   bg = Colors.surface; border = Colors.borderMd; dot = Colors.muted;
-                } else if (building.level === "low") {
+                } else if (representativeBuilding.level === "low") {
                   bg = Colors.card; border = Colors.low; dot = Colors.low;
-                } else if (building.level === "med") {
+                } else if (representativeBuilding.level === "med") {
                   bg = Colors.card; border = Colors.med; dot = Colors.med;
                 } else {
                   bg = Colors.card; border = Colors.high; dot = Colors.high;
                 }
 
-                const noRooms = building.roomCount === 0;
+                const noRooms = groupRoomCount === 0;
 
                 return (
                   <MLRN.Marker
@@ -427,7 +439,7 @@ export default function MapScreen() {
         visible={sheetVisible}
         onClose={() => setSheetVisible(false)}
         activeFilters={activeFilters}
-        preloadedRooms={selectedGroupRooms}
+        sections={selectedGroupSections}
       />
     </SafeAreaView>
   );
