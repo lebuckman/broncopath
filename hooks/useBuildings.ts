@@ -27,7 +27,9 @@ export function useBuildings() {
   }, []);
 
   function refresh() {
-    return getBuildings().then(setBuildings).catch(setError);
+    return getBuildings()
+      .then((data) => setBuildings(Array.isArray(data) ? data : []))
+      .catch(setError);
   }
 
   return { buildings, loading, error, refresh };

@@ -76,7 +76,9 @@ export default function BuildingDetailSheet({
       const aFav = isFavorite(a.id) ? 0 : 1;
       const bFav = isFavorite(b.id) ? 0 : 1;
       if (aFav !== bFav) return aFav - bFav;
-      return a.number.localeCompare(b.number, undefined, { numeric: true });
+      return (a.number ?? "").localeCompare(b.number ?? "", undefined, {
+        numeric: true,
+      });
     });
   })();
 

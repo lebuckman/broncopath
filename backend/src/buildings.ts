@@ -6,31 +6,45 @@ import { getBuildingOccupancy, getRoomStatus } from "./serviceFunctions.ts";
 
 const router = Router();
 
+async function inBatches<T, R>(
+  items: T[],
+  batchSize: number,
+  fn: (item: T) => Promise<R>,
+): Promise<(R | null)[]> {
+  const results: (R | null)[] = [];
+  for (let i = 0; i < items.length; i += batchSize) {
+    const settled = await Promise.allSettled(
+      items.slice(i, i + batchSize).map(fn),
+    );
+    for (const s of settled) {
+      results.push(s.status === "fulfilled" ? s.value : null);
+    }
+  }
+  return results;
+}
+
 router.get("/", async (_req, res) => {
   try {
     const allBuildings = await db.select().from(buildings);
 
-    const result = await Promise.all(
-      allBuildings.map(async (building) => {
-        const { occupancy, level, roomCount, freeCount } =
-          await getBuildingOccupancy(building.id);
+    const results = await inBatches(allBuildings, 10, async (building) => {
+      const { occupancy, level, roomCount, freeCount } =
+        await getBuildingOccupancy(building.id);
+      return {
+        id: building.id,
+        name: building.name,
+        code: building.code,
+        latitude: building.latitude,
+        longitude: building.longitude,
+        occupancy,
+        level,
+        roomCount,
+        freeCount,
+        updatedAt: new Date().toISOString(),
+      };
+    });
 
-        return {
-          id: building.id,
-          name: building.name,
-          code: building.code,
-          latitude: building.latitude,
-          longitude: building.longitude,
-          occupancy,
-          level,
-          roomCount,
-          freeCount,
-          updatedAt: new Date().toISOString(),
-        };
-      }),
-    );
-
-    res.json(result);
+    res.json(results.filter(Boolean));
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Failed to fetch buildings" });
@@ -46,25 +60,22 @@ router.get("/:id/rooms", async (req, res) => {
       .from(rooms)
       .where(eq(rooms.buildingId, buildingId));
 
-    const result = await Promise.all(
-      buildingRooms.map(async (room) => {
-        const roomStatus = await getRoomStatus(room.id);
+    const results = await inBatches(buildingRooms, 10, async (room) => {
+      const roomStatus = await getRoomStatus(room.id);
+      return {
+        id: room.id,
+        number: room.number,
+        type: room.type,
+        capacity: room.capacity,
+        status: roomStatus.status,
+        ...("freesAt" in roomStatus && { freesAt: roomStatus.freesAt }),
+        ...("freeUntil" in roomStatus && { freeUntil: roomStatus.freeUntil }),
+        ...("courseName" in roomStatus &&
+          roomStatus.courseName && { courseName: roomStatus.courseName }),
+      };
+    });
 
-        return {
-          id: room.id,
-          number: room.number,
-          type: room.type,
-          capacity: room.capacity,
-          status: roomStatus.status,
-          ...("freesAt" in roomStatus && { freesAt: roomStatus.freesAt }),
-          ...("freeUntil" in roomStatus && { freeUntil: roomStatus.freeUntil }),
-          ...("courseName" in roomStatus &&
-            roomStatus.courseName && { courseName: roomStatus.courseName }),
-        };
-      }),
-    );
-
-    res.json(result);
+    res.json(results.filter(Boolean));
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Failed to fetch rooms" });

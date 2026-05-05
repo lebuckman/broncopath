@@ -128,7 +128,9 @@ export default function RoomsScreen() {
         const sortedRooms = rooms
           .slice()
           .sort((a, b) =>
-            a.number.localeCompare(b.number, undefined, { numeric: true }),
+            (a.number ?? "").localeCompare(b.number ?? "", undefined, {
+              numeric: true,
+            }),
           );
 
         return {
