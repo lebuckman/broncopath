@@ -54,6 +54,8 @@ type Props = {
   routeActive: boolean;
   routeMinutes: number | null;
   routeMeters: number | null;
+  markersHidden: boolean;
+  onToggleMarkersHidden: () => void;
 };
 
 export default function FloatingMapSearchBar({
@@ -77,6 +79,8 @@ export default function FloatingMapSearchBar({
   routeActive,
   routeMinutes,
   routeMeters,
+  markersHidden,
+  onToggleMarkersHidden,
 }: Props) {
   // Content area: grows below the bar
   const contentHeightAnim = useRef(new Animated.Value(0)).current;
@@ -281,6 +285,13 @@ export default function FloatingMapSearchBar({
                   · {routeMeters} m
                 </Text>
               )}
+              <Pressable onPress={onToggleMarkersHidden} hitSlop={8}>
+                <Feather
+                  name={markersHidden ? "eye-off" : "eye"}
+                  size={13}
+                  color={markersHidden ? Colors.accent : Colors.muted}
+                />
+              </Pressable>
               <Pressable onPress={() => onExpandedChange(true)} hitSlop={8} style={{ marginLeft: 2 }}>
                 <Feather name="edit-2" size={13} color={Colors.muted} />
               </Pressable>

@@ -61,6 +61,7 @@ export default function MapScreen() {
   const [startBuilding, setStartBuilding] = useState<Building | null>(null);
   const [endBuilding, setEndBuilding] = useState<Building | null>(null);
   const [routeSheetExpanded, setRouteSheetExpanded] = useState(false);
+  const [markersHidden, setMarkersHidden] = useState(false);
 
   const [routeGeoJSON, setRouteGeoJSON] = useState<GeoJSONLine | null>(null);
   const [routeDistanceMeters, setRouteDistanceMeters] = useState<number | null>(
@@ -236,6 +237,7 @@ export default function MapScreen() {
     setRouteGeoJSON(null);
     setRouteDistanceMeters(null);
     setRouteWalkTimeSeconds(null);
+    setMarkersHidden(false);
   }
 
   function fitCameraToRoute() {
@@ -350,7 +352,10 @@ export default function MapScreen() {
                 </MLRN.GeoJSONSource>
               )}
 
-              {visibleGroups.map((group) => {
+              {visibleGroups.filter((group) => {
+                if (!markersHidden) return true;
+                return group.primary.id === startBuilding?.id || group.primary.id === endBuilding?.id;
+              }).map((group) => {
                 const building = group.primary;
                 const isStart = startBuilding?.id === building.id;
                 const isEnd = endBuilding?.id === building.id;
@@ -455,6 +460,8 @@ export default function MapScreen() {
               routeActive={routeGeoJSON !== null && !routeSheetExpanded}
               routeMinutes={routeMinutes}
               routeMeters={routeMeters}
+              markersHidden={markersHidden}
+              onToggleMarkersHidden={() => setMarkersHidden((p) => !p)}
             />
           </>
         )}
