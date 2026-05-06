@@ -21,6 +21,7 @@
     "expo": "~55.0.23",
     "expo-blur": "~55.0.14",
     "expo-constants": "~55.0.7",
+    "expo-dev-client": "~55.0.32",
     "expo-font": "~55.0.4",
     "expo-linking": "~55.0.15",
     "expo-router": "~55.0.14",
