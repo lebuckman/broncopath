@@ -8,6 +8,7 @@ import {
   View,
   Text,
 } from "react-native";
+import { useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import { Colors } from "../../constants/colors";
 import { Fonts } from "../../constants/fonts";
@@ -17,6 +18,8 @@ import { useFavorites } from "../../hooks/useFavorites";
 import FavoriteButton from "../ui/FavoriteButton";
 import RoomBadge from "../ui/RoomBadge";
 import CountdownTimer from "../ui/CountdownTimer";
+import DirectionsButton from "../ui/DirectionsButton";
+import { closeAllDirectionButtons } from "../../lib/directionsSignal";
 
 if (
   Platform.OS === "android" &&
@@ -44,9 +47,16 @@ export default function BuildingAccordion({
   sections,
   forceExpanded,
 }: Props) {
+  const router = useRouter();
   const [expanded, setExpanded] = useState(false);
   const { isFavorite, toggleFavorite } = useFavorites();
   const isExpanded = expanded || !!forceExpanded;
+
+  function handleDirections(targetId: string, action: "from" | "to" | "view") {
+    const param = `${targetId}_${Date.now()}`;
+    const key = action === "from" ? "routeFrom" : action === "to" ? "routeTo" : "viewBuilding";
+    router.push(`/(tabs)/map?${key}=${param}` as any);
+  }
 
   async function handleShare(room: Room) {
     const statusLine = room.freeUntil
@@ -69,6 +79,7 @@ export default function BuildingAccordion({
   }
 
   function toggle() {
+    closeAllDirectionButtons();
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setExpanded((prev) => !prev);
   }
@@ -101,15 +112,18 @@ export default function BuildingAccordion({
 
         <View className="flex-row items-center gap-2">
           {freeCount > 0 && (
-            <View>
-              <Text
-                className="text-sm"
-                style={{ color: Colors.accent, fontFamily: Fonts.bodySemiBold }}
-              >
-                {freeCount} free
-              </Text>
-            </View>
+            <Text
+              className="text-sm"
+              style={{ color: Colors.accent, fontFamily: Fonts.bodySemiBold }}
+            >
+              {freeCount} free
+            </Text>
           )}
+          <DirectionsButton
+            onSetFrom={() => handleDirections(buildingId, "from")}
+            onSetTo={() => handleDirections(buildingId, "to")}
+            onViewOnMap={() => handleDirections(buildingId, "view")}
+          />
           <Feather
             name={isExpanded ? "chevron-up" : "chevron-down"}
             size={16}
@@ -133,6 +147,9 @@ export default function BuildingAccordion({
                 <View
                   className="px-5"
                   style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "space-between",
                     paddingTop: si === 0 ? 14 : 16,
                     paddingBottom: 4,
                     borderTopWidth: si === 0 ? 0 : 1,
@@ -149,6 +166,11 @@ export default function BuildingAccordion({
                   >
                     {section.building.code}
                   </Text>
+                  <DirectionsButton
+                    onSetFrom={() => handleDirections(section.building.id, "from")}
+                    onSetTo={() => handleDirections(section.building.id, "to")}
+                    onViewOnMap={() => handleDirections(section.building.id, "view")}
+                  />
                 </View>
                 {section.rooms.map((room) => (
                   <View

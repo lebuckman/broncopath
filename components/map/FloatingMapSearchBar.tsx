@@ -16,6 +16,7 @@ import { Feather } from "@expo/vector-icons";
 import { Colors } from "../../constants/colors";
 import { Fonts } from "../../constants/fonts";
 import GroupedChipFilter from "../ui/GroupedChipFilter";
+import { closeAllDirectionButtons } from "../../lib/directionsSignal";
 import type { FilterMode } from "../../lib/roomFilters";
 import type { Building } from "../../constants/mockData";
 
@@ -440,6 +441,7 @@ export default function FloatingMapSearchBar({
               value={query}
               onChangeText={setQuery}
               onFocus={() => {
+                closeAllDirectionButtons();
                 if (!expanded) onExpandedChange(true);
               }}
               placeholder={

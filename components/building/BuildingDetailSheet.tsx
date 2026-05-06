@@ -16,6 +16,7 @@ import FavoriteButton from "../ui/FavoriteButton";
 import RoomBadge from "../ui/RoomBadge";
 import CountdownTimer from "../ui/CountdownTimer";
 import SectionLabel from "../ui/SectionLabel";
+import DirectionsButton from "../ui/DirectionsButton";
 
 interface Props {
   building: Building | null;
@@ -25,6 +26,9 @@ interface Props {
   filterRoomIds?: string[];
   preloadedRooms?: Room[];
   sections?: BuildingSection[];
+  onSetRouteFrom?: (building: Building) => void;
+  onSetRouteTo?: (building: Building) => void;
+  onViewOnMap?: (building: Building) => void;
 }
 
 function roomBadgeLabel(room: Room): string | undefined {
@@ -54,6 +58,9 @@ export default function BuildingDetailSheet({
   filterRoomIds,
   preloadedRooms,
   sections,
+  onSetRouteFrom,
+  onSetRouteTo,
+  onViewOnMap,
 }: Props) {
   const insets = useSafeAreaInsets();
   const fadeAnim = useRef(new Animated.Value(1)).current;
@@ -185,12 +192,21 @@ export default function BuildingDetailSheet({
           {groupRoomCount === 0 ? (
             /* No-classroom buildings: simple header, no occupancy/rooms */
             <View className="px-5 pt-3 pb-6">
-              <Text
-                className="text-[22px] mb-1"
-                style={{ color: Colors.text, fontFamily: Fonts.display }}
-              >
-                {building.name}
-              </Text>
+              <View style={{ flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 4 }}>
+                <Text
+                  className="text-[22px]"
+                  style={{ color: Colors.text, fontFamily: Fonts.display, flex: 1, marginRight: 8 }}
+                >
+                  {building.name}
+                </Text>
+                {onSetRouteFrom && (
+                  <DirectionsButton
+                    onSetFrom={() => onSetRouteFrom(building)}
+                    onSetTo={() => onSetRouteTo!(building)}
+                    onViewOnMap={() => onViewOnMap!(building)}
+                  />
+                )}
+              </View>
               <Text
                 className="text-[12px] mb-6"
                 style={{ color: Colors.muted, fontFamily: Fonts.body }}
@@ -229,12 +245,21 @@ export default function BuildingDetailSheet({
                 className="px-5 pt-3 pb-4"
                 style={{ borderBottomColor: Colors.border, borderBottomWidth: 1 }}
               >
-                <Text
-                  className="text-[22px] mb-1"
-                  style={{ color: Colors.text, fontFamily: Fonts.display }}
-                >
-                  {building.name}
-                </Text>
+                <View style={{ flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 4 }}>
+                  <Text
+                    className="text-[22px]"
+                    style={{ color: Colors.text, fontFamily: Fonts.display, flex: 1, marginRight: 8 }}
+                  >
+                    {building.name}
+                  </Text>
+                  {onSetRouteFrom && (
+                    <DirectionsButton
+                      onSetFrom={() => onSetRouteFrom(building)}
+                      onSetTo={() => onSetRouteTo!(building)}
+                      onViewOnMap={() => onViewOnMap!(building)}
+                    />
+                  )}
+                </View>
 
                 {building.roomCount > 0 ? (
                   <>
@@ -301,6 +326,9 @@ export default function BuildingDetailSheet({
                         const sectionHeader = (
                           <View
                             style={{
+                              flexDirection: "row",
+                              alignItems: "center",
+                              justifyContent: "space-between",
                               paddingTop: si === 0 ? 0 : 16,
                               paddingBottom: 4,
                               borderTopWidth: si === 0 ? 0 : 1,
@@ -317,6 +345,13 @@ export default function BuildingDetailSheet({
                             >
                               {section.building.code}
                             </Text>
+                            {onSetRouteFrom && (
+                              <DirectionsButton
+                                onSetFrom={() => onSetRouteFrom(section.building)}
+                                onSetTo={() => onSetRouteTo!(section.building)}
+                                onViewOnMap={() => onViewOnMap!(section.building)}
+                              />
+                            )}
                           </View>
                         );
                         if (!hasDbRooms) {

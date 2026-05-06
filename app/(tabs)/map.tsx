@@ -29,7 +29,12 @@ import { findBuildingNode } from "../../lib/routing/findBuildingNode";
 const MAP_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
 
 export default function MapScreen() {
-  const { recenterMap } = useLocalSearchParams<{ recenterMap?: string }>();
+  const { recenterMap, routeFrom, routeTo, viewBuilding } = useLocalSearchParams<{
+    recenterMap?: string;
+    routeFrom?: string;
+    routeTo?: string;
+    viewBuilding?: string;
+  }>();
   const cameraRef = useRef<any>(null);
 
   const { buildings, loading } = useBuildings();
@@ -135,13 +140,31 @@ export default function MapScreen() {
 
   useEffect(() => {
     if (!recenterMap) return;
-
     cameraRef.current?.flyTo({
       center: [CPP_REGION.longitude, CPP_REGION.latitude],
       zoom: 16,
       duration: 500,
     });
   }, [recenterMap]);
+
+  useEffect(() => {
+    if (!routeFrom || !buildings.length) return;
+    const b = buildings.find((b) => b.id === (routeFrom as string).split("_")[0]);
+    if (b) { setStartBuilding(b); setRouteSheetExpanded(true); }
+  }, [routeFrom, buildings]);
+
+  useEffect(() => {
+    if (!routeTo || !buildings.length) return;
+    const b = buildings.find((b) => b.id === (routeTo as string).split("_")[0]);
+    if (b) { setEndBuilding(b); setRouteSheetExpanded(true); }
+  }, [routeTo, buildings]);
+
+  useEffect(() => {
+    if (!viewBuilding || !buildings.length) return;
+    const b = buildings.find((b) => b.id === (viewBuilding as string).split("_")[0]);
+    if (!b) return;
+    cameraRef.current?.flyTo({ center: [b.longitude, b.latitude], zoom: 17, duration: 500 });
+  }, [viewBuilding, buildings]);
 
   const buildingIds = buildings.map((building) => building.id).join(",");
 
@@ -443,6 +466,20 @@ export default function MapScreen() {
         onClose={() => setSheetVisible(false)}
         activeFilters={activeFilters}
         sections={selectedGroupSections}
+        onSetRouteFrom={(b) => {
+          setStartBuilding(b);
+          setSheetVisible(false);
+          setRouteSheetExpanded(true);
+        }}
+        onSetRouteTo={(b) => {
+          setEndBuilding(b);
+          setSheetVisible(false);
+          setRouteSheetExpanded(true);
+        }}
+        onViewOnMap={(b) => {
+          setSheetVisible(false);
+          cameraRef.current?.flyTo({ center: [b.longitude, b.latitude], zoom: 17, duration: 500 });
+        }}
       />
     </SafeAreaView>
   );
