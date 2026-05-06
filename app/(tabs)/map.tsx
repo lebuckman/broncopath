@@ -10,6 +10,7 @@ import type { Building, Room } from "../../constants/mockData";
 import { useBuildings } from "../../hooks/useBuildings";
 import { useFavorites } from "../../hooks/useFavorites";
 import { useCampusGraph } from "../../hooks/useCampusGraph";
+import { useCongestion } from "../../hooks/useCongestion";
 import {
   getCachedBuildingsMemory,
   getCachedRoomsMemory,
@@ -49,21 +50,32 @@ function areSameRoute(a: RoutingGraphEdge[], b: RoutingGraphEdge[]) {
 
 export default function MapScreen() {
   const [routeChoice, setRouteChoice] = useState<RouteChoice>("shortest");
-  const [shortestRouteGeoJSON, setShortestRouteGeoJSON] = useState<GeoJSONLine | null>(null);
-  const [leastCrowdedRouteGeoJSON, setLeastCrowdedRouteGeoJSON] = useState<GeoJSONLine | null>(null);
-  const [selectedRouteGeoJSON, setSelectedRouteGeoJSON] = useState<GeoJSONLine | null>(null);
-  const [shortestDistanceMeters, setShortestDistanceMeters] = useState<number | null>(null);
-  const [shortestWalkTimeSeconds, setShortestWalkTimeSeconds] = useState<number | null>(null);
-  const [leastCrowdedDistanceMeters, setLeastCrowdedDistanceMeters] = useState<number | null>(null);
-  const [leastCrowdedWalkTimeSeconds, setLeastCrowdedWalkTimeSeconds] = useState<number | null>(null);
+  const [shortestRouteGeoJSON, setShortestRouteGeoJSON] =
+    useState<GeoJSONLine | null>(null);
+  const [leastCrowdedRouteGeoJSON, setLeastCrowdedRouteGeoJSON] =
+    useState<GeoJSONLine | null>(null);
+  const [selectedRouteGeoJSON, setSelectedRouteGeoJSON] =
+    useState<GeoJSONLine | null>(null);
+  const [shortestDistanceMeters, setShortestDistanceMeters] = useState<
+    number | null
+  >(null);
+  const [shortestWalkTimeSeconds, setShortestWalkTimeSeconds] = useState<
+    number | null
+  >(null);
+  const [leastCrowdedDistanceMeters, setLeastCrowdedDistanceMeters] = useState<
+    number | null
+  >(null);
+  const [leastCrowdedWalkTimeSeconds, setLeastCrowdedWalkTimeSeconds] =
+    useState<number | null>(null);
   const [routesAreDifferent, setRoutesAreDifferent] = useState(false);
 
-  const { recenterMap, routeFrom, routeTo, viewBuilding } = useLocalSearchParams<{
-    recenterMap?: string;
-    routeFrom?: string;
-    routeTo?: string;
-    viewBuilding?: string;
-  }>();
+  const { recenterMap, routeFrom, routeTo, viewBuilding } =
+    useLocalSearchParams<{
+      recenterMap?: string;
+      routeFrom?: string;
+      routeTo?: string;
+      viewBuilding?: string;
+    }>();
   const cameraRef = useRef<any>(null);
 
   const { buildings, loading } = useBuildings();
@@ -77,7 +89,7 @@ export default function MapScreen() {
       map[building.id] = getCachedRoomsMemory(building.id);
     });
     return map;
-  })
+  });
 
   const [selected, setSelected] = useState<Building | null>(null);
   const [sheetVisible, setSheetVisible] = useState(false);
@@ -110,8 +122,18 @@ export default function MapScreen() {
       return;
     }
 
-    const startNode = findBuildingNode(routingGraph, startBuilding.id, startBuilding.latitude, startBuilding.longitude);
-    const endNode = findBuildingNode(routingGraph, endBuilding.id, endBuilding.latitude, endBuilding.longitude);
+    const startNode = findBuildingNode(
+      routingGraph,
+      startBuilding.id,
+      startBuilding.latitude,
+      startBuilding.longitude,
+    );
+    const endNode = findBuildingNode(
+      routingGraph,
+      endBuilding.id,
+      endBuilding.latitude,
+      endBuilding.longitude,
+    );
 
     if (!startNode || !endNode) {
       setShortestRouteGeoJSON(null);
@@ -209,8 +231,13 @@ export default function MapScreen() {
     if (!routeFrom || !buildings.length) return;
     if (appliedRouteFrom.current === routeFrom) return;
     appliedRouteFrom.current = routeFrom;
-    const b = buildings.find((b) => b.id === (routeFrom as string).split("_")[0]);
-    if (b) { setStartBuilding(b); setRouteSheetExpanded(true); }
+    const b = buildings.find(
+      (b) => b.id === (routeFrom as string).split("_")[0],
+    );
+    if (b) {
+      setStartBuilding(b);
+      setRouteSheetExpanded(true);
+    }
   }, [routeFrom, buildings]);
 
   useEffect(() => {
@@ -218,16 +245,25 @@ export default function MapScreen() {
     if (appliedRouteTo.current === routeTo) return;
     appliedRouteTo.current = routeTo;
     const b = buildings.find((b) => b.id === (routeTo as string).split("_")[0]);
-    if (b) { setEndBuilding(b); setRouteSheetExpanded(true); }
+    if (b) {
+      setEndBuilding(b);
+      setRouteSheetExpanded(true);
+    }
   }, [routeTo, buildings]);
 
   useEffect(() => {
     if (!viewBuilding || !buildings.length) return;
     if (appliedViewBuilding.current === viewBuilding) return;
     appliedViewBuilding.current = viewBuilding;
-    const b = buildings.find((b) => b.id === (viewBuilding as string).split("_")[0]);
+    const b = buildings.find(
+      (b) => b.id === (viewBuilding as string).split("_")[0],
+    );
     if (!b) return;
-    cameraRef.current?.flyTo({ center: [b.longitude, b.latitude], zoom: 17, duration: 500 });
+    cameraRef.current?.flyTo({
+      center: [b.longitude, b.latitude],
+      zoom: 17,
+      duration: 500,
+    });
   }, [viewBuilding, buildings]);
 
   const buildingIds = buildings.map((building) => building.id).join(",");
@@ -235,25 +271,6 @@ export default function MapScreen() {
   useEffect(() => {
     if (!buildingIds) return;
 
-    let cancelled = false;
-
-    async function loadAllRooms() {
-      await Promise.all(
-        buildings.map(async (building) => {
-          try {
-            const rooms = await getRoomsCached(building.id);
-
-            if (!cancelled) {
-              setRoomsMap((prev) => ({
-                ...prev,
-                [building.id]: rooms,
-              }));
-            }
-          } catch {
-            // Ignore per-building room failures on the map.
-          }
-        }),
-      );
     let cancelled = false;
 
     async function loadAllRooms() {
@@ -357,13 +374,14 @@ export default function MapScreen() {
     const routeWidth = maxLng - minLng;
     const routeHeight = maxLat - minLat;
     const maxRouteDimension = Math.max(routeWidth, routeHeight);
-    const zoomCenter = Math.floor(
-      Math.log2(360 / (maxRouteDimension * .75)) - 1,
-    ); // 1.5 is padding factor
+    const zoomCenter = Math.min(
+      17,
+      Math.max(14, Math.floor(Math.log2(360 / (maxRouteDimension * 0.75)) - 1)),
+    );
 
     cameraRef.current?.flyTo({
       center: [lngCenter, latCenter],
-      zoom,
+      zoom: zoomCenter,
       duration: 500,
     });
 
@@ -478,89 +496,113 @@ export default function MapScreen() {
                 </MLRN.GeoJSONSource>
               )}
 
-              {visibleGroups.filter((group) => {
-                if (!markersHidden) return true;
-                return group.primary.id === startBuilding?.id || group.primary.id === endBuilding?.id;
-              }).map((group) => {
-                const building = group.primary;
-                const isStart = startBuilding?.id === building.id;
-                const isEnd = endBuilding?.id === building.id;
-                const isGrouped = group.allIds.length > 1;
+              {visibleGroups
+                .filter((group) => {
+                  if (!markersHidden) return true;
+                  return (
+                    group.primary.id === startBuilding?.id ||
+                    group.primary.id === endBuilding?.id
+                  );
+                })
+                .map((group) => {
+                  const building = group.primary;
+                  const isStart = startBuilding?.id === building.id;
+                  const isEnd = endBuilding?.id === building.id;
+                  const isGrouped = group.allIds.length > 1;
 
-                const groupRoomCount = group.allIds.reduce((sum, id) => {
-                  const b = buildings.find((b) => b.id === id);
-                  return sum + (b?.roomCount ?? 0);
-                }, 0);
-                const representativeBuilding =
-                  [building, ...group.aliases].find((b) => b.roomCount > 0) ??
-                  building;
+                  const groupRoomCount = group.allIds.reduce((sum, id) => {
+                    const b = buildings.find((b) => b.id === id);
+                    return sum + (b?.roomCount ?? 0);
+                  }, 0);
+                  const representativeBuilding =
+                    [building, ...group.aliases].find((b) => b.roomCount > 0) ??
+                    building;
 
-                let bg: string, border: string, dot: string;
-                if (isStart) {
-                  bg = "#3b82f6"; border = "#3b82f6"; dot = "#fff";
-                } else if (isEnd) {
-                  bg = "#ef4444"; border = "#ef4444"; dot = "#fff";
-                } else if (groupRoomCount === 0) {
-                  bg = Colors.surface; border = Colors.borderMd; dot = Colors.muted;
-                } else if (representativeBuilding.level === "low") {
-                  bg = Colors.card; border = Colors.low; dot = Colors.low;
-                } else if (representativeBuilding.level === "med") {
-                  bg = Colors.card; border = Colors.med; dot = Colors.med;
-                } else {
-                  bg = Colors.card; border = Colors.high; dot = Colors.high;
-                }
+                  let bg: string, border: string, dot: string;
+                  if (isStart) {
+                    bg = "#3b82f6";
+                    border = "#3b82f6";
+                    dot = "#fff";
+                  } else if (isEnd) {
+                    bg = "#ef4444";
+                    border = "#ef4444";
+                    dot = "#fff";
+                  } else if (groupRoomCount === 0) {
+                    bg = Colors.surface;
+                    border = Colors.borderMd;
+                    dot = Colors.muted;
+                  } else if (representativeBuilding.level === "low") {
+                    bg = Colors.card;
+                    border = Colors.low;
+                    dot = Colors.low;
+                  } else if (representativeBuilding.level === "med") {
+                    bg = Colors.card;
+                    border = Colors.med;
+                    dot = Colors.med;
+                  } else {
+                    bg = Colors.card;
+                    border = Colors.high;
+                    dot = Colors.high;
+                  }
 
-                const noRooms = groupRoomCount === 0;
+                  const noRooms = groupRoomCount === 0;
 
-                return (
-                  <MLRN.Marker
-                    key={building.id}
-                    id={`building-${building.id}`}
-                    lngLat={[building.longitude, building.latitude]}
-                    anchor="center"
-                    onPress={() => handleMarkerPress(building)}
-                  >
-                    <View
-                      style={{
-                        flexDirection: "row",
-                        alignItems: "center",
-                        gap: 4,
-                        backgroundColor: bg,
-                        borderColor: border,
-                        borderWidth: 1,
-                        borderRadius: 20,
-                        paddingHorizontal: noRooms ? 6 : 7,
-                        paddingVertical: noRooms ? 3 : 4,
-                      }}
+                  return (
+                    <MLRN.Marker
+                      key={building.id}
+                      id={`building-${building.id}`}
+                      lngLat={[building.longitude, building.latitude]}
+                      anchor="center"
+                      onPress={() => handleMarkerPress(building)}
                     >
                       <View
                         style={{
-                          width: noRooms ? 5 : 6,
-                          height: noRooms ? 5 : 6,
-                          borderRadius: 3,
-                          backgroundColor: dot,
-                        }}
-                      />
-                      <Text
-                        style={{
-                          color: Colors.text,
-                          fontFamily: Fonts.bodySemiBold,
-                          fontSize: noRooms ? 10 : 11,
+                          flexDirection: "row",
+                          alignItems: "center",
+                          gap: 4,
+                          backgroundColor: bg,
+                          borderColor: border,
+                          borderWidth: 1,
+                          borderRadius: 20,
+                          paddingHorizontal: noRooms ? 6 : 7,
+                          paddingVertical: noRooms ? 3 : 4,
                         }}
                       >
-                        {building.code}
-                        {isGrouped ? " +" : ""}
-                      </Text>
-                    </View>
-                  </MLRN.Marker>
-                );
-              })}
+                        <View
+                          style={{
+                            width: noRooms ? 5 : 6,
+                            height: noRooms ? 5 : 6,
+                            borderRadius: 3,
+                            backgroundColor: dot,
+                          }}
+                        />
+                        <Text
+                          style={{
+                            color: Colors.text,
+                            fontFamily: Fonts.bodySemiBold,
+                            fontSize: noRooms ? 10 : 11,
+                          }}
+                        >
+                          {building.code}
+                          {isGrouped ? " +" : ""}
+                        </Text>
+                      </View>
+                    </MLRN.Marker>
+                  );
+                })}
             </MLRN.Map>
 
             {/* Backdrop — tapping outside the card closes the menu */}
             {routeSheetExpanded && (
               <Pressable
-                style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 25 }}
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  zIndex: 25,
+                }}
                 onPress={() => setRouteSheetExpanded(false)}
               />
             )}
@@ -603,7 +645,11 @@ export default function MapScreen() {
         visible={sheetVisible}
         onClose={() => setSheetVisible(false)}
         activeFilters={activeFilters}
-        preloadedRooms={selected && !selectedGroupSections ? (roomsMap[selected.id] ?? []) : undefined}
+        preloadedRooms={
+          selected && !selectedGroupSections
+            ? (roomsMap[selected.id] ?? [])
+            : undefined
+        }
         sections={selectedGroupSections}
         onSetRouteFrom={(b) => {
           setStartBuilding(b);
@@ -617,7 +663,11 @@ export default function MapScreen() {
         }}
         onViewOnMap={(b) => {
           setSheetVisible(false);
-          cameraRef.current?.flyTo({ center: [b.longitude, b.latitude], zoom: 17, duration: 500 });
+          cameraRef.current?.flyTo({
+            center: [b.longitude, b.latitude],
+            zoom: 17,
+            duration: 500,
+          });
         }}
       />
     </SafeAreaView>
