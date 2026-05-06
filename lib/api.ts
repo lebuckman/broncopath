@@ -1,7 +1,3 @@
-// Fetch wrapper for the BroncoPath API.
-// All functions currently return mock data.
-// To switch to the live backend, uncomment the fetch call and remove the mock return.
-
 import type { Building, Room, RouteOption } from '../constants/mockData';
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://localhost:3000';
