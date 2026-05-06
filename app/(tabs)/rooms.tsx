@@ -17,8 +17,11 @@ import { Fonts } from "../../constants/fonts";
 import type { Room } from "../../constants/mockData";
 import { useBuildings } from "../../hooks/useBuildings";
 import { useFavorites } from "../../hooks/useFavorites";
-import { getRooms } from "../../lib/api";
-import { getCachedBuildings, getCachedRooms } from "../../lib/dataCache";
+import {
+  getCachedBuildingsMemory,
+  getCachedRoomsMemory,
+  getRoomsCached,
+} from "../../lib/dataCache";
 import { applyRoomFilters, type FilterMode } from "../../lib/roomFilters";
 import { groupBuildingsByComplex } from "../../lib/buildingGroups";
 import type { BuildingSection } from "../../lib/buildingGroups";
@@ -35,8 +38,8 @@ export default function RoomsScreen() {
   const { favorites } = useFavorites();
   const [roomsMap, setRoomsMap] = useState<Record<string, Room[]>>(() => {
     const map: Record<string, Room[]> = {};
-    getCachedBuildings().forEach((b) => {
-      map[b.id] = getCachedRooms(b.id);
+    getCachedBuildingsMemory().forEach((b) => {
+      map[b.id] = getCachedRoomsMemory(b.id);
     });
     return map;
   });
@@ -53,14 +56,15 @@ export default function RoomsScreen() {
   async function handleRefresh() {
     setRefreshing(true);
     try {
-      await Promise.all([
-        refresh(),
-        ...buildings.map((b) =>
-          getRooms(b.id).then((rooms) =>
-            setRoomsMap((prev) => ({ ...prev, [b.id]: rooms })),
-          ),
-        ),
-      ]);
+      const refreshedBuildings = await refresh();
+      const list = Array.isArray(refreshedBuildings) ? refreshedBuildings : buildings;
+
+      await Promise.all(
+        list.map(async (b) => {
+          const rooms = await getRoomsCached(b.id, { force: true });
+          setRoomsMap((prev) => ({ ...prev, [b.id]: rooms }));
+        }),
+      );
     } finally {
       setRefreshing(false);
     }
@@ -71,14 +75,17 @@ export default function RoomsScreen() {
   useEffect(() => {
     if (!buildingIds) return;
 
-    function fetchAllRooms() {
-      buildings.forEach((b) => {
-        getRooms(b.id)
-          .then((rooms) => {
+    async function fetchAllRooms() {
+      await Promise.all(
+        buildings.map(async (b) => {
+          try {
+            const rooms = await getRoomsCached(b.id, { force: true });
             setRoomsMap((prev) => ({ ...prev, [b.id]: rooms }));
-          })
-          .catch(() => {});
-      });
+          } catch {
+            // Ignore individual room fetch failures.
+          }
+        }),
+      );
     }
 
     fetchAllRooms();

@@ -1,15 +1,18 @@
 import { useState, useEffect, useRef } from "react";
 import { AppState } from "react-native";
-import { getRooms } from "../lib/api";
 import type { Room } from "../constants/mockData";
-import { getCachedRooms, isRoomsCached } from "../lib/dataCache";
+import {
+  getRoomsCached,
+  getCachedRoomsMemory,
+  isRoomsCachedMemory,
+} from "../lib/dataCache";
 
 export function useRooms(buildingId: string) {
   const [rooms, setRooms] = useState<Room[]>(() =>
-    buildingId ? getCachedRooms(buildingId) : [],
+    buildingId ? getCachedRoomsMemory(buildingId) : [],
   );
   const [loading, setLoading] = useState(() =>
-    buildingId ? !isRoomsCached(buildingId) : false,
+    buildingId ? !isRoomsCachedMemory(buildingId) : false,
   );
   const [error, setError] = useState<Error | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -21,16 +24,25 @@ export function useRooms(buildingId: string) {
       return;
     }
 
-    function fetchRooms() {
-      getRooms(buildingId)
-        .then(setRooms)
-        .catch(setError)
-        .finally(() => setLoading(false));
+    async function fetchRooms(force = false) {
+      try {
+        const result = await getRoomsCached(buildingId, { force });
+        setRooms(result);
+        setError(null);
+      } catch (err) {
+        setError(err instanceof Error ? err : new Error("Failed to fetch rooms"));
+      } finally {
+        setLoading(false);
+      }
     }
 
     function startPolling() {
+      // Immediately show cached data for this building before network fetch
+      setRooms(getCachedRoomsMemory(buildingId));
+      setLoading(!isRoomsCachedMemory(buildingId));
+      setError(null);
       fetchRooms();
-      intervalRef.current = setInterval(fetchRooms, 300_000);
+      intervalRef.current = setInterval(() => fetchRooms(true), 300_000);
     }
 
     function stopPolling() {
@@ -40,10 +52,6 @@ export function useRooms(buildingId: string) {
       }
     }
 
-    // Immediately swap to cached data for the new building (clears stale rooms from previous building)
-    setRooms(getCachedRooms(buildingId));
-    setLoading(!isRoomsCached(buildingId));
-    setError(null);
     startPolling();
 
     const sub = AppState.addEventListener("change", (state) => {

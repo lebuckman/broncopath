@@ -10,8 +10,11 @@ import type { Building, Room } from "../../constants/mockData";
 import { useBuildings } from "../../hooks/useBuildings";
 import { useFavorites } from "../../hooks/useFavorites";
 import { useCampusGraph } from "../../hooks/useCampusGraph";
-import { getRooms } from "../../lib/api";
-import { getCachedBuildings, getCachedRooms } from "../../lib/dataCache";
+import {
+  getCachedBuildingsMemory,
+  getCachedRoomsMemory,
+  getRoomsCached,
+} from "../../lib/dataCache";
 import { applyRoomFilters, type FilterMode } from "../../lib/roomFilters";
 import { groupBuildings } from "../../lib/buildingGroups";
 import type { BuildingSection } from "../../lib/buildingGroups";
@@ -49,8 +52,8 @@ export default function MapScreen() {
   const [roomsMap, setRoomsMap] = useState<Record<string, Room[]>>(() => {
     const map: Record<string, Room[]> = {};
 
-    getCachedBuildings().forEach((building) => {
-      map[building.id] = getCachedRooms(building.id);
+    getCachedBuildingsMemory().forEach((building) => {
+      map[building.id] = getCachedRoomsMemory(building.id);
     });
 
     return map;
@@ -174,20 +177,28 @@ export default function MapScreen() {
   useEffect(() => {
     if (!buildingIds) return;
 
-    function fetchAllRooms() {
-      buildings.forEach((building) => {
-        getRooms(building.id)
-          .then((rooms) => {
-            setRoomsMap((prev) => ({
-              ...prev,
-              [building.id]: rooms,
-            }));
-          })
-          .catch(() => {});
-      });
+    let cancelled = false;
+
+    async function loadAllRooms() {
+      await Promise.all(
+        buildings.map(async (building) => {
+          try {
+            const rooms = await getRoomsCached(building.id);
+
+            if (!cancelled) {
+              setRoomsMap((prev) => ({
+                ...prev,
+                [building.id]: rooms,
+              }));
+            }
+          } catch {
+            // Ignore per-building room failures on the map.
+          }
+        }),
+      );
     }
 
-    fetchAllRooms();
+    loadAllRooms();
 
     const intervalId = setInterval(fetchAllRooms, 300_000);
     return () => clearInterval(intervalId);
@@ -256,7 +267,6 @@ export default function MapScreen() {
     const lngCenter = (minLng + maxLng) / 2;
     const latCenter = (minLat + maxLat) / 2;
     const maxDim = Math.max(maxLng - minLng, maxLat - minLat);
-    // Clamp zoom: log2 formula calibrated for campus-scale routes → 15–17
     const rawZoom = Math.log2(360 / (maxDim * 2));
     const zoom = Math.min(17, Math.max(15, rawZoom));
 

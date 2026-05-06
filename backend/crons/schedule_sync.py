@@ -606,12 +606,22 @@ def upsert_schedule_rows(database_url: str, rows: list[dict], semester: str):
             cur.execute("select id from rooms")
             valid_room_ids = {row[0] for row in cur.fetchall()}
 
-        filtered = [row for row in deduped if row["roomId"] in valid_room_ids]
-        skipped_count = len(deduped) - len(filtered)
-        if skipped_count:
-            print(f"Skipped {skipped_count} schedule entries for missing rooms.")
+            filtered = [
+                row for row in deduped
+                if row["roomId"] in valid_room_ids
+            ]
 
-        with conn.cursor() as cur:
+            skipped = [
+                row for row in deduped
+                if row["roomId"] not in valid_room_ids
+            ]
+
+            if skipped:
+                print(
+                    "Skipped schedule rows for missing rooms:",
+                    sorted({row["roomId"] for row in skipped})[:25],
+                )
+
             cur.executemany(
                 """
                 insert into schedule_entries
