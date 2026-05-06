@@ -94,6 +94,7 @@ export default function FloatingMapSearchBar({
   const [activeField, setActiveField] = useState<RouteField>("from");
   const [query, setQuery] = useState("");
   const inputRef = useRef<TextInput>(null);
+  const listRef = useRef<ScrollView>(null);
 
   // Swipe-down to close — attached to drag handle only
   const panResponder = useRef(
@@ -179,6 +180,10 @@ export default function FloatingMapSearchBar({
       }).start(() => setPillVisible(false));
     }
   }, [routeActive, expanded]);
+
+  useEffect(() => {
+    listRef.current?.scrollTo({ y: 0, animated: false });
+  }, [query]);
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -590,6 +595,7 @@ export default function FloatingMapSearchBar({
 
               {/* Building list — extra padding to match the original inset */}
               <ScrollView
+                ref={listRef}
                 style={{ maxHeight: SCREEN_H * 0.28, marginHorizontal: 12 }}
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={false}
