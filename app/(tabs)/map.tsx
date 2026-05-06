@@ -141,6 +141,7 @@ export default function MapScreen() {
 
   useEffect(() => {
     if (!recenterMap) return;
+    setRouteSheetExpanded(false);
     cameraRef.current?.flyTo({
       center: [CPP_REGION.longitude, CPP_REGION.latitude],
       zoom: 16,
