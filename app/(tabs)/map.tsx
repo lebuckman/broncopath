@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { View, Text, ActivityIndicator, Pressable } from "react-native";
-import { Feather } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams } from "expo-router";
 import * as MLRN from "@maplibre/maplibre-react-native";
@@ -17,8 +16,6 @@ import { applyRoomFilters, type FilterMode } from "../../lib/roomFilters";
 import { groupBuildings } from "../../lib/buildingGroups";
 import type { BuildingSection } from "../../lib/buildingGroups";
 import { CPP_REGION } from "../../constants/campus";
-import MapLegend from "../../components/map/MapLegend";
-import RoutePlannerSheet from "../../components/map/RoutePlannerSheet";
 import FloatingMapSearchBar from "../../components/map/FloatingMapSearchBar";
 import BuildingDetailSheet from "../../components/building/BuildingDetailSheet";
 import { buildRoutingGraph } from "../../lib/routing/buildGraph";
@@ -406,95 +403,20 @@ export default function MapScreen() {
               })}
             </MLRN.Map>
 
+            {/* Backdrop — tapping outside the card closes the menu */}
+            {routeSheetExpanded && (
+              <Pressable
+                style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 25 }}
+                onPress={() => setRouteSheetExpanded(false)}
+              />
+            )}
+
             <FloatingMapSearchBar
               activeFilters={activeFilters}
               filterMode={filterMode}
               showFavorites={favorites.length > 0}
               onChangeFilters={setActiveFilters}
               onChangeFilterMode={setFilterMode}
-              onFocusSearch={() => setRouteSheetExpanded(true)}
-            />
-
-            {/* Legend — top right */}
-            <View
-              pointerEvents="box-none"
-              style={{
-                position: "absolute",
-                top: 12,
-                right: 12,
-                zIndex: 10,
-              }}
-            >
-              <MapLegend />
-            </View>
-
-            {/* Active route pill — top left */}
-            {routeGeoJSON && (
-              <View
-                pointerEvents="box-none"
-                style={{
-                  position: "absolute",
-                  top: 12,
-                  left: 12,
-                  zIndex: 15,
-                }}
-              >
-                <View
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    backgroundColor: "rgba(20,24,31,0.82)",
-                    borderColor: Colors.border,
-                    borderWidth: 1,
-                    borderRadius: 20,
-                    paddingHorizontal: 12,
-                    paddingVertical: 7,
-                    gap: 7,
-                  }}
-                >
-                  <View
-                    style={{
-                      width: 7,
-                      height: 7,
-                      borderRadius: 3.5,
-                      backgroundColor: Colors.accent,
-                    }}
-                  />
-                  <Text
-                    style={{
-                      color: Colors.text,
-                      fontFamily: Fonts.bodyMedium,
-                      fontSize: 12,
-                    }}
-                  >
-                    {routeMinutes != null ? `${routeMinutes} min` : "Route active"}
-                  </Text>
-                  {routeMeters != null && (
-                    <Text
-                      style={{
-                        color: Colors.muted,
-                        fontFamily: Fonts.body,
-                        fontSize: 12,
-                      }}
-                    >
-                      · {routeMeters} m
-                    </Text>
-                  )}
-                  <Pressable
-                    onPress={() => setRouteSheetExpanded(true)}
-                    style={{ marginLeft: 2 }}
-                    hitSlop={8}
-                  >
-                    <Feather name="edit-2" size={13} color={Colors.muted} />
-                  </Pressable>
-                  <Pressable onPress={clearRoute} hitSlop={8}>
-                    <Feather name="x" size={14} color={Colors.muted} />
-                  </Pressable>
-                </View>
-              </View>
-            )}
-
-            <RoutePlannerSheet
               expanded={routeSheetExpanded}
               onExpandedChange={setRouteSheetExpanded}
               buildings={buildings}
@@ -507,6 +429,9 @@ export default function MapScreen() {
               onClearRoute={clearRoute}
               onGo={fitCameraToRoute}
               onLocateBuilding={handleLocateBuilding}
+              routeActive={routeGeoJSON !== null && !routeSheetExpanded}
+              routeMinutes={routeMinutes}
+              routeMeters={routeMeters}
             />
           </>
         )}

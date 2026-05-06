@@ -3,6 +3,7 @@ import {
   Animated,
   Dimensions,
   Easing,
+  PanResponder,
   Pressable,
   ScrollView,
   Text,
@@ -19,7 +20,6 @@ import type { Building } from "../../constants/mockData";
 type RouteField = "from" | "to";
 
 const SCREEN_H = Dimensions.get("window").height;
-const SHEET_HEIGHT = SCREEN_H * 0.74;
 
 type Props = {
   expanded: boolean;
@@ -57,25 +57,52 @@ export default function RoutePlannerSheet({
   onGo,
   onLocateBuilding,
 }: Props) {
-  const slideAnim = useRef(new Animated.Value(SCREEN_H)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current;
+  const opacityAnim = useRef(new Animated.Value(0)).current;
   const [activeField, setActiveField] = useState<RouteField>("from");
   const [query, setQuery] = useState("");
 
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dy) > 5,
+      onPanResponderRelease: (_, g) => {
+        if (g.dy > 50) onExpandedChange(false);
+      },
+    }),
+  ).current;
+
   useEffect(() => {
     if (expanded) {
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 320,
-        easing: Easing.out(Easing.poly(4)),
-        useNativeDriver: true,
-      }).start();
+      Animated.parallel([
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 220,
+          easing: Easing.out(Easing.poly(3)),
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacityAnim, {
+          toValue: 1,
+          duration: 220,
+          easing: Easing.out(Easing.poly(3)),
+          useNativeDriver: true,
+        }),
+      ]).start();
     } else {
-      Animated.timing(slideAnim, {
-        toValue: SCREEN_H,
-        duration: 240,
-        easing: Easing.in(Easing.poly(2)),
-        useNativeDriver: true,
-      }).start();
+      Animated.parallel([
+        Animated.timing(slideAnim, {
+          toValue: 20,
+          duration: 160,
+          easing: Easing.in(Easing.poly(2)),
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacityAnim, {
+          toValue: 0,
+          duration: 160,
+          easing: Easing.in(Easing.poly(2)),
+          useNativeDriver: true,
+        }),
+      ]).start();
     }
   }, [expanded]);
 
@@ -94,9 +121,10 @@ export default function RoutePlannerSheet({
   function selectBuilding(building: Building) {
     if (activeField === "from") {
       onSelectStart(building);
-      setActiveField("to");
+      if (!endBuilding) setActiveField("to");
     } else {
       onSelectEnd(building);
+      if (!startBuilding) setActiveField("from");
     }
     setQuery("");
   }
@@ -122,21 +150,20 @@ export default function RoutePlannerSheet({
       pointerEvents={expanded ? "box-none" : "none"}
       style={{
         position: "absolute",
-        left: 0,
-        right: 0,
-        bottom: 0,
-        height: SHEET_HEIGHT,
+        left: 16,
+        right: 16,
+        bottom: 88,
+        maxHeight: SCREEN_H * 0.65,
         zIndex: 30,
         transform: [{ translateY: slideAnim }],
+        opacity: opacityAnim,
       }}
     >
       <BlurView
         intensity={52}
         tint="dark"
         style={{
-          height: "100%",
-          borderTopLeftRadius: 34,
-          borderTopRightRadius: 34,
+          borderRadius: 24,
           overflow: "hidden",
           backgroundColor: "rgba(20, 24, 31, 0.88)",
           borderColor: Colors.border,
@@ -144,13 +171,16 @@ export default function RoutePlannerSheet({
           shadowColor: "#000",
           shadowOpacity: 0.32,
           shadowRadius: 24,
-          shadowOffset: { width: 0, height: -10 },
+          shadowOffset: { width: 0, height: -6 },
           elevation: 12,
         }}
       >
-        <View style={{ flex: 1, paddingBottom: 16 }}>
-          {/* Drag handle */}
-          <View style={{ alignItems: "center", paddingTop: 10, paddingBottom: 4 }}>
+        <View style={{ paddingBottom: 16 }}>
+          {/* Drag handle — swipe target */}
+          <View
+            style={{ alignItems: "center", paddingTop: 10, paddingBottom: 4 }}
+            {...panResponder.panHandlers}
+          >
             <View
               style={{
                 width: 40,
@@ -195,7 +225,7 @@ export default function RoutePlannerSheet({
             </Pressable>
           </View>
 
-          <View style={{ paddingHorizontal: 20, flex: 1 }}>
+          <View style={{ paddingHorizontal: 20 }}>
             {/* FROM / TO card */}
             <View
               style={{
@@ -341,7 +371,7 @@ export default function RoutePlannerSheet({
 
             {/* Building list */}
             <ScrollView
-              style={{ flex: 1 }}
+              style={{ maxHeight: SCREEN_H * 0.22 }}
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
             >
@@ -370,7 +400,6 @@ export default function RoutePlannerSheet({
                       borderBottomWidth: index < results.length - 1 ? 1 : 0,
                     }}
                   >
-                    {/* Row tap → selects from/to */}
                     <Pressable
                       onPress={() => selectBuilding(building)}
                       style={{ flex: 1, paddingVertical: 11 }}
@@ -396,7 +425,6 @@ export default function RoutePlannerSheet({
                       </Text>
                     </Pressable>
 
-                    {/* Locate icon → fly camera to building */}
                     <Pressable
                       onPress={() => onLocateBuilding(building)}
                       hitSlop={8}
