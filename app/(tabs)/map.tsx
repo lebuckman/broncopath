@@ -10,6 +10,7 @@ import type { Building, Room } from "../../constants/mockData";
 import { useBuildings } from "../../hooks/useBuildings";
 import { useFavorites } from "../../hooks/useFavorites";
 import { useCampusGraph } from "../../hooks/useCampusGraph";
+import { useCongestion } from "../../hooks/useCongestion";
 import {
   getCachedBuildingsMemory,
   getCachedRoomsMemory,
@@ -23,16 +24,41 @@ import FloatingMapSearchBar from "../../components/map/FloatingMapSearchBar";
 import BuildingDetailSheet from "../../components/building/BuildingDetailSheet";
 import { buildRoutingGraph } from "../../lib/routing/buildGraph";
 import { dijkstra } from "../../lib/routing/dijkstra";
+import { dijkstraLeastCrowded } from "../../lib/routing/dijkstraLeastCrowded";
 import {
   routeToLineString,
   type GeoJSONLine,
 } from "../../lib/routing/routeToGeoJSON";
 import { findBuildingNode } from "../../lib/routing/findBuildingNode";
 import mapStyle from "../../assets/map-style.json";
+import type { RoutingGraphEdge } from "../../lib/routing/types";
 
 const MAP_STYLE_URL = mapStyle as any;
+type RouteChoice = "shortest" | "leastCrowded";
+
+function getCurrentTimeHHMM() {
+  const now = new Date();
+  return `${String(now.getHours()).padStart(2, "0")}:${String(
+    now.getMinutes(),
+  ).padStart(2, "0")}`;
+}
+
+function areSameRoute(a: RoutingGraphEdge[], b: RoutingGraphEdge[]) {
+  if (a.length !== b.length) return false;
+  return a.every((edge, index) => edge.id === b[index].id);
+}
 
 export default function MapScreen() {
+  const [routeChoice, setRouteChoice] = useState<RouteChoice>("shortest");
+  const [shortestRouteGeoJSON, setShortestRouteGeoJSON] = useState<GeoJSONLine | null>(null);
+  const [leastCrowdedRouteGeoJSON, setLeastCrowdedRouteGeoJSON] = useState<GeoJSONLine | null>(null);
+  const [selectedRouteGeoJSON, setSelectedRouteGeoJSON] = useState<GeoJSONLine | null>(null);
+  const [shortestDistanceMeters, setShortestDistanceMeters] = useState<number | null>(null);
+  const [shortestWalkTimeSeconds, setShortestWalkTimeSeconds] = useState<number | null>(null);
+  const [leastCrowdedDistanceMeters, setLeastCrowdedDistanceMeters] = useState<number | null>(null);
+  const [leastCrowdedWalkTimeSeconds, setLeastCrowdedWalkTimeSeconds] = useState<number | null>(null);
+  const [routesAreDifferent, setRoutesAreDifferent] = useState(false);
+
   const { recenterMap, routeFrom, routeTo, viewBuilding } = useLocalSearchParams<{
     recenterMap?: string;
     routeFrom?: string;
@@ -67,69 +93,106 @@ export default function MapScreen() {
   const [routeSheetExpanded, setRouteSheetExpanded] = useState(false);
   const [markersHidden, setMarkersHidden] = useState(false);
 
-  const [routeGeoJSON, setRouteGeoJSON] = useState<GeoJSONLine | null>(null);
-  const [routeDistanceMeters, setRouteDistanceMeters] = useState<number | null>(
-    null,
-  );
-  const [routeWalkTimeSeconds, setRouteWalkTimeSeconds] = useState<
-    number | null
-  >(null);
-
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
   const [filterMode, setFilterMode] = useState<FilterMode>("any");
-
-  const routeMinutes =
-    routeWalkTimeSeconds != null
-      ? Math.max(1, Math.round(routeWalkTimeSeconds / 60))
-      : null;
-  const routeMeters =
-    routeDistanceMeters != null ? Math.round(routeDistanceMeters) : null;
 
   const routingGraph = useMemo(() => {
     if (!graph) return null;
     return buildRoutingGraph(graph.nodes, graph.edges);
   }, [graph]);
 
+  const { congestion } = useCongestion(routingGraph);
+
   useEffect(() => {
     if (!routingGraph || !startBuilding || !endBuilding) {
-      setRouteGeoJSON(null);
-      setRouteDistanceMeters(null);
-      setRouteWalkTimeSeconds(null);
+      setShortestRouteGeoJSON(null);
+      setLeastCrowdedRouteGeoJSON(null);
+      setSelectedRouteGeoJSON(null);
+      setShortestDistanceMeters(null);
+      setShortestWalkTimeSeconds(null);
+      setLeastCrowdedDistanceMeters(null);
+      setLeastCrowdedWalkTimeSeconds(null);
+      setRoutesAreDifferent(false);
       return;
     }
 
     const startNode = findBuildingNode(routingGraph, startBuilding.id, startBuilding.latitude, startBuilding.longitude);
     const endNode = findBuildingNode(routingGraph, endBuilding.id, endBuilding.latitude, endBuilding.longitude);
 
-    console.log("Routing from/to", {
-      startBuilding: startBuilding.id,
-      endBuilding: endBuilding.id,
-      startNode,
-      endNode,
-    });
-
     if (!startNode || !endNode) {
-      setRouteGeoJSON(null);
-      setRouteDistanceMeters(null);
-      setRouteWalkTimeSeconds(null);
+      setShortestRouteGeoJSON(null);
+      setLeastCrowdedRouteGeoJSON(null);
+      setSelectedRouteGeoJSON(null);
+      setShortestDistanceMeters(null);
+      setShortestWalkTimeSeconds(null);
+      setLeastCrowdedDistanceMeters(null);
+      setLeastCrowdedWalkTimeSeconds(null);
+      setRoutesAreDifferent(false);
       return;
     }
 
-    const result = dijkstra(routingGraph, startNode.id, endNode.id);
+    const shortest = dijkstra(routingGraph, startNode.id, endNode.id);
 
-    console.log("Route result", result);
-
-    if (!result) {
-      setRouteGeoJSON(null);
-      setRouteDistanceMeters(null);
-      setRouteWalkTimeSeconds(null);
+    if (!shortest) {
+      setShortestRouteGeoJSON(null);
+      setLeastCrowdedRouteGeoJSON(null);
+      setSelectedRouteGeoJSON(null);
+      setShortestDistanceMeters(null);
+      setShortestWalkTimeSeconds(null);
+      setLeastCrowdedDistanceMeters(null);
+      setLeastCrowdedWalkTimeSeconds(null);
+      setRoutesAreDifferent(false);
       return;
     }
 
-    setRouteGeoJSON(routeToLineString(result.path));
-    setRouteDistanceMeters(result.totalDistance);
-    setRouteWalkTimeSeconds(result.totalTime);
-  }, [routingGraph, startBuilding, endBuilding]);
+    const shortestGeoJSON = routeToLineString(shortest.path);
+
+    setShortestRouteGeoJSON(shortestGeoJSON);
+    setShortestDistanceMeters(shortest.totalDistance);
+    setShortestWalkTimeSeconds(shortest.totalTime);
+
+    if (!congestion) {
+      setLeastCrowdedRouteGeoJSON(null);
+      setLeastCrowdedDistanceMeters(null);
+      setLeastCrowdedWalkTimeSeconds(null);
+      setRoutesAreDifferent(false);
+      setSelectedRouteGeoJSON(shortestGeoJSON);
+      setRouteChoice("shortest");
+      return;
+    }
+
+    const leastCrowded = dijkstraLeastCrowded(
+      routingGraph,
+      startNode.id,
+      endNode.id,
+      congestion,
+      {
+        departureTime: getCurrentTimeHHMM(),
+        congestionWeight: 90,
+      },
+    );
+
+    if (!leastCrowded || areSameRoute(shortest.path, leastCrowded.path)) {
+      setLeastCrowdedRouteGeoJSON(null);
+      setLeastCrowdedDistanceMeters(null);
+      setLeastCrowdedWalkTimeSeconds(null);
+      setRoutesAreDifferent(false);
+      setSelectedRouteGeoJSON(shortestGeoJSON);
+      setRouteChoice("shortest");
+      return;
+    }
+
+    const leastCrowdedGeoJSON = routeToLineString(leastCrowded.path);
+
+    setLeastCrowdedRouteGeoJSON(leastCrowdedGeoJSON);
+    setLeastCrowdedDistanceMeters(leastCrowded.totalDistance);
+    setLeastCrowdedWalkTimeSeconds(leastCrowded.totalTime);
+    setRoutesAreDifferent(true);
+
+    setSelectedRouteGeoJSON(
+      routeChoice === "leastCrowded" ? leastCrowdedGeoJSON : shortestGeoJSON,
+    );
+  }, [routingGraph, startBuilding, endBuilding, congestion, routeChoice]);
 
   useEffect(() => {
     if (!graph) return;
@@ -200,7 +263,7 @@ export default function MapScreen() {
 
     loadAllRooms();
 
-    const intervalId = setInterval(fetchAllRooms, 300_000);
+    const intervalId = setInterval(loadAllRooms, 300_000);
     return () => clearInterval(intervalId);
   }, [buildingIds, buildings]);
 
@@ -247,14 +310,23 @@ export default function MapScreen() {
   function clearRoute() {
     setStartBuilding(null);
     setEndBuilding(null);
-    setRouteGeoJSON(null);
-    setRouteDistanceMeters(null);
-    setRouteWalkTimeSeconds(null);
     setMarkersHidden(false);
-  }
+    setRouteChoice("shortest");
 
+    setShortestRouteGeoJSON(null);
+    setLeastCrowdedRouteGeoJSON(null);
+    setSelectedRouteGeoJSON(null);
+
+    setShortestDistanceMeters(null);
+    setShortestWalkTimeSeconds(null);
+
+    setLeastCrowdedDistanceMeters(null);
+    setLeastCrowdedWalkTimeSeconds(null);
+
+    setRoutesAreDifferent(false);
+  }
   function fitCameraToRoute() {
-    const coordinates = routeGeoJSON?.geometry?.coordinates;
+    const coordinates = selectedRouteGeoJSON?.geometry?.coordinates;
     if (!coordinates || coordinates.length === 0) return;
 
     const lngs = coordinates.map((c) => c[0]);
@@ -326,8 +398,6 @@ export default function MapScreen() {
               logo={false}
               attribution={false}
               onDidFinishLoadingStyle={() => {
-                console.log("Map style loaded");
-
                 cameraRef.current?.flyTo({
                   center: [CPP_REGION.longitude, CPP_REGION.latitude],
                   zoom: 16,
@@ -346,8 +416,33 @@ export default function MapScreen() {
                 }}
               />
 
-              {routeGeoJSON && (
-                <MLRN.GeoJSONSource id="routeSource" data={routeGeoJSON}>
+              {leastCrowdedRouteGeoJSON && (
+                <MLRN.GeoJSONSource
+                  id="leastCrowdedRouteSource"
+                  data={leastCrowdedRouteGeoJSON}
+                >
+                  <MLRN.Layer
+                    id="leastCrowdedRouteLine"
+                    type="line"
+                    paint={{
+                      "line-color": "#38bdf8",
+                      "line-width": 5,
+                      "line-opacity": 0.9,
+                      "line-dasharray": [2, 2],
+                    }}
+                    layout={{
+                      "line-cap": "round",
+                      "line-join": "round",
+                    }}
+                  />
+                </MLRN.GeoJSONSource>
+              )}
+
+              {selectedRouteGeoJSON && (
+                <MLRN.GeoJSONSource
+                  id="routeSource"
+                  data={selectedRouteGeoJSON}
+                >
                   <MLRN.Layer
                     id="routeLine"
                     type="line"
@@ -462,8 +557,13 @@ export default function MapScreen() {
               buildings={buildings}
               startBuilding={startBuilding}
               endBuilding={endBuilding}
-              routeDistanceMeters={routeDistanceMeters}
-              routeWalkTimeSeconds={routeWalkTimeSeconds}
+              routeChoice={routeChoice}
+              onRouteChoiceChange={setRouteChoice}
+              showLeastCrowdedOption={routesAreDifferent}
+              shortestDistanceMeters={shortestDistanceMeters}
+              shortestWalkTimeSeconds={shortestWalkTimeSeconds}
+              leastCrowdedDistanceMeters={leastCrowdedDistanceMeters}
+              leastCrowdedWalkTimeSeconds={leastCrowdedWalkTimeSeconds}
               onSelectStart={setStartBuilding}
               onSelectEnd={setEndBuilding}
               onClearStart={() => setStartBuilding(null)}
@@ -471,9 +571,7 @@ export default function MapScreen() {
               onClearRoute={clearRoute}
               onGo={fitCameraToRoute}
               onLocateBuilding={handleLocateBuilding}
-              routeActive={routeGeoJSON !== null && !routeSheetExpanded}
-              routeMinutes={routeMinutes}
-              routeMeters={routeMeters}
+              routeActive={selectedRouteGeoJSON !== null && !routeSheetExpanded}
               markersHidden={markersHidden}
               onToggleMarkersHidden={() => setMarkersHidden((p) => !p)}
             />

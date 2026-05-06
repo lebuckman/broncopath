@@ -74,6 +74,24 @@ export async function getCampusGraphVersion(): Promise<CampusGraphVersion> {
   return response.json();
 }
 
+export async function fetchClassSchedule(): Promise<ClassScheduleEntry[]> {
+  const res = await fetch("/api/schedule"); 
+  if (!res.ok) {
+    throw new Error("Failed to fetch schedule");
+  }
+  return res.json();
+}
+
+export type ClassScheduleEntry = {
+  id: string;
+  roomId: string;
+  buildingId: string;
+  dayOfWeek: string;
+  startTime: string;
+  endTime: string;
+  enrollment?: number;
+};
+
 export type CampusGraphVersion = {
   id: string;
   campusId: string;

@@ -20,6 +20,7 @@ import type { Building } from "../../constants/mockData";
 type RouteField = "from" | "to";
 
 const SCREEN_H = Dimensions.get("window").height;
+type RouteChoice = "shortest" | "leastCrowded";
 
 type Props = {
   expanded: boolean;
@@ -27,8 +28,16 @@ type Props = {
   buildings: Building[];
   startBuilding: Building | null;
   endBuilding: Building | null;
-  routeDistanceMeters?: number | null;
-  routeWalkTimeSeconds?: number | null;
+
+  routeChoice: RouteChoice;
+  onRouteChoiceChange: (choice: RouteChoice) => void;
+  showLeastCrowdedOption: boolean;
+
+  shortestDistanceMeters?: number | null;
+  shortestWalkTimeSeconds?: number | null;
+  leastCrowdedDistanceMeters?: number | null;
+  leastCrowdedWalkTimeSeconds?: number | null;
+
   onSelectStart: (building: Building) => void;
   onSelectEnd: (building: Building) => void;
   onClearRoute: () => void;
@@ -49,8 +58,16 @@ export default function RoutePlannerSheet({
   buildings,
   startBuilding,
   endBuilding,
-  routeDistanceMeters,
-  routeWalkTimeSeconds,
+
+  routeChoice,
+  onRouteChoiceChange,
+  showLeastCrowdedOption,
+
+  shortestDistanceMeters,
+  shortestWalkTimeSeconds,
+  leastCrowdedDistanceMeters,
+  leastCrowdedWalkTimeSeconds,
+
   onSelectStart,
   onSelectEnd,
   onClearRoute,
@@ -135,12 +152,22 @@ export default function RoutePlannerSheet({
     onSelectEnd(startBuilding);
   }
 
+  const selectedWalkTimeSeconds =
+    routeChoice === "leastCrowded"
+      ? leastCrowdedWalkTimeSeconds
+      : shortestWalkTimeSeconds;
+
+  const selectedDistanceMeters =
+    routeChoice === "leastCrowded"
+      ? leastCrowdedDistanceMeters
+      : shortestDistanceMeters;
+
   const minutes =
-    routeWalkTimeSeconds != null
-      ? Math.max(1, Math.round(routeWalkTimeSeconds / 60))
+    selectedWalkTimeSeconds != null
+      ? Math.max(1, Math.round(selectedWalkTimeSeconds / 60))
       : null;
   const meters =
-    routeDistanceMeters != null ? Math.round(routeDistanceMeters) : null;
+    selectedDistanceMeters != null ? Math.round(selectedDistanceMeters) : null;
 
   const canSwap = !!startBuilding && !!endBuilding;
   const showSummary = !!startBuilding && !!endBuilding;
@@ -176,7 +203,7 @@ export default function RoutePlannerSheet({
         }}
       >
         <View style={{ paddingBottom: 16 }}>
-          {/* Drag handle — swipe target */}
+          {/* Drag handle */}
           <View
             style={{ alignItems: "center", paddingTop: 10, paddingBottom: 4 }}
             {...panResponder.panHandlers}
@@ -437,6 +464,96 @@ export default function RoutePlannerSheet({
               )}
             </ScrollView>
 
+            {/* Route choice toggle */}
+            {showLeastCrowdedOption && showSummary && (
+              <View
+                style={{
+                  flexDirection: "row",
+                  gap: 8,
+                  marginTop: 10,
+                  marginBottom: 2,
+                }}
+              >
+                <Pressable
+                  onPress={() => onRouteChoiceChange("shortest")}
+                  style={{
+                    flex: 1,
+                    borderRadius: 16,
+                    paddingVertical: 10,
+                    paddingHorizontal: 12,
+                    backgroundColor:
+                      routeChoice === "shortest" ? Colors.accent : Colors.card,
+                    borderColor: Colors.border,
+                    borderWidth: 1,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color:
+                        routeChoice === "shortest" ? Colors.bg : Colors.text,
+                      fontFamily: Fonts.bodySemiBold,
+                      fontSize: 13,
+                    }}
+                  >
+                    Shortest
+                  </Text>
+                  <Text
+                    style={{
+                      color:
+                        routeChoice === "shortest" ? Colors.bg : Colors.muted,
+                      fontFamily: Fonts.body,
+                      fontSize: 11,
+                      marginTop: 2,
+                    }}
+                  >
+                    Fastest walk
+                  </Text>
+                </Pressable>
+
+                <Pressable
+                  onPress={() => onRouteChoiceChange("leastCrowded")}
+                  style={{
+                    flex: 1,
+                    borderRadius: 16,
+                    paddingVertical: 10,
+                    paddingHorizontal: 12,
+                    backgroundColor:
+                      routeChoice === "leastCrowded"
+                        ? Colors.accent
+                        : Colors.card,
+                    borderColor: Colors.border,
+                    borderWidth: 1,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color:
+                        routeChoice === "leastCrowded"
+                          ? Colors.bg
+                          : Colors.text,
+                      fontFamily: Fonts.bodySemiBold,
+                      fontSize: 13,
+                    }}
+                  >
+                    Least crowded
+                  </Text>
+                  <Text
+                    style={{
+                      color:
+                        routeChoice === "leastCrowded"
+                          ? Colors.bg
+                          : Colors.muted,
+                      fontFamily: Fonts.body,
+                      fontSize: 11,
+                      marginTop: 2,
+                    }}
+                  >
+                    Avoids traffic
+                  </Text>
+                </Pressable>
+              </View>
+            )}
+
             {/* Route summary + CTA */}
             {showSummary && (
               <View
@@ -500,10 +617,10 @@ export default function RoutePlannerSheet({
 
                   <Pressable
                     onPress={onGo}
-                    disabled={!routeDistanceMeters}
+                    disabled={!selectedDistanceMeters}
                     style={{
                       borderRadius: 14,
-                      backgroundColor: routeDistanceMeters
+                      backgroundColor: selectedDistanceMeters
                         ? Colors.accent
                         : Colors.border,
                       paddingHorizontal: 22,

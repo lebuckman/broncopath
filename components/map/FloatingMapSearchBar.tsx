@@ -25,6 +25,7 @@ const BG = "rgba(20, 24, 31, 0.82)";
 const BLUR_INTENSITY = 45;
 
 type RouteField = "from" | "to";
+type RouteChoice = "shortest" | "leastCrowded";
 
 function sortBuildings(a: Building, b: Building) {
   const aNum = Number.parseInt(String(a.id), 10);
@@ -44,8 +45,13 @@ type Props = {
   buildings: Building[];
   startBuilding: Building | null;
   endBuilding: Building | null;
-  routeDistanceMeters: number | null;
-  routeWalkTimeSeconds: number | null;
+  routeChoice: RouteChoice;
+  onRouteChoiceChange: (choice: RouteChoice) => void;
+  showLeastCrowdedOption: boolean;
+  shortestDistanceMeters?: number | null;
+  shortestWalkTimeSeconds?: number | null;
+  leastCrowdedDistanceMeters?: number | null;
+  leastCrowdedWalkTimeSeconds?: number | null;
   onSelectStart: (b: Building) => void;
   onSelectEnd: (b: Building) => void;
   onClearStart: () => void;
@@ -54,8 +60,6 @@ type Props = {
   onGo: () => void;
   onLocateBuilding: (b: Building) => void;
   routeActive: boolean;
-  routeMinutes: number | null;
-  routeMeters: number | null;
   markersHidden: boolean;
   onToggleMarkersHidden: () => void;
 };
@@ -71,8 +75,13 @@ export default function FloatingMapSearchBar({
   buildings,
   startBuilding,
   endBuilding,
-  routeDistanceMeters,
-  routeWalkTimeSeconds,
+  routeChoice,
+  onRouteChoiceChange,
+  showLeastCrowdedOption,
+  shortestDistanceMeters,
+  shortestWalkTimeSeconds,
+  leastCrowdedDistanceMeters,
+  leastCrowdedWalkTimeSeconds,
   onSelectStart,
   onSelectEnd,
   onClearStart,
@@ -81,8 +90,6 @@ export default function FloatingMapSearchBar({
   onGo,
   onLocateBuilding,
   routeActive,
-  routeMinutes,
-  routeMeters,
   markersHidden,
   onToggleMarkersHidden,
 }: Props) {
@@ -223,12 +230,16 @@ export default function FloatingMapSearchBar({
     onSelectEnd(startBuilding);
   }
 
+  const activeDistanceMeters =
+    routeChoice === "leastCrowded" ? leastCrowdedDistanceMeters : shortestDistanceMeters;
+  const activeWalkTimeSeconds =
+    routeChoice === "leastCrowded" ? leastCrowdedWalkTimeSeconds : shortestWalkTimeSeconds;
   const minutes =
-    routeWalkTimeSeconds != null
-      ? Math.max(1, Math.round(routeWalkTimeSeconds / 60))
+    activeWalkTimeSeconds != null
+      ? Math.max(1, Math.round(activeWalkTimeSeconds / 60))
       : null;
   const meters =
-    routeDistanceMeters != null ? Math.round(routeDistanceMeters) : null;
+    activeDistanceMeters != null ? Math.round(activeDistanceMeters) : null;
 
   const filterLabel = useMemo(() => {
     if (activeFilters.length === 0) return "Filters";
@@ -282,11 +293,11 @@ export default function FloatingMapSearchBar({
                 style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: Colors.accent }}
               />
               <Text style={{ color: Colors.text, fontFamily: Fonts.bodyMedium, fontSize: 12 }}>
-                {routeMinutes != null ? `${routeMinutes} min` : "Route active"}
+                {minutes != null ? `${minutes} min` : "Route active"}
               </Text>
-              {routeMeters != null && (
+              {meters != null && (
                 <Text style={{ color: Colors.muted, fontFamily: Fonts.body, fontSize: 12 }}>
-                  · {routeMeters} m
+                  · {meters} m
                 </Text>
               )}
               <Pressable onPress={onToggleMarkersHidden} hitSlop={8}>
@@ -702,6 +713,87 @@ export default function FloatingMapSearchBar({
                 )}
               </ScrollView>
 
+              {/* Route choice toggle — only when two distinct routes exist */}
+              {showLeastCrowdedOption && showSummary && (
+                <View
+                  style={{
+                    flexDirection: "row",
+                    gap: 8,
+                    marginTop: 8,
+                    marginHorizontal: 12,
+                    marginBottom: 4,
+                  }}
+                >
+                  <Pressable
+                    onPress={() => onRouteChoiceChange("shortest")}
+                    style={{
+                      flex: 1,
+                      borderRadius: 14,
+                      paddingVertical: 9,
+                      paddingHorizontal: 12,
+                      backgroundColor:
+                        routeChoice === "shortest" ? Colors.accent : Colors.card,
+                      borderColor: Colors.border,
+                      borderWidth: 1,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: routeChoice === "shortest" ? Colors.bg : Colors.text,
+                        fontFamily: Fonts.bodySemiBold,
+                        fontSize: 12,
+                      }}
+                    >
+                      Shortest
+                    </Text>
+                    <Text
+                      style={{
+                        color: routeChoice === "shortest" ? Colors.bg : Colors.muted,
+                        fontFamily: Fonts.body,
+                        fontSize: 10,
+                        marginTop: 1,
+                      }}
+                    >
+                      Fastest walk
+                    </Text>
+                  </Pressable>
+
+                  <Pressable
+                    onPress={() => onRouteChoiceChange("leastCrowded")}
+                    style={{
+                      flex: 1,
+                      borderRadius: 14,
+                      paddingVertical: 9,
+                      paddingHorizontal: 12,
+                      backgroundColor:
+                        routeChoice === "leastCrowded" ? Colors.accent : Colors.card,
+                      borderColor: Colors.border,
+                      borderWidth: 1,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: routeChoice === "leastCrowded" ? Colors.bg : Colors.text,
+                        fontFamily: Fonts.bodySemiBold,
+                        fontSize: 12,
+                      }}
+                    >
+                      Least crowded
+                    </Text>
+                    <Text
+                      style={{
+                        color: routeChoice === "leastCrowded" ? Colors.bg : Colors.muted,
+                        fontFamily: Fonts.body,
+                        fontSize: 10,
+                        marginTop: 1,
+                      }}
+                    >
+                      Avoids traffic
+                    </Text>
+                  </Pressable>
+                </View>
+              )}
+
               {/* Route summary + GO */}
               {showSummary && (
                 <View
@@ -755,10 +847,10 @@ export default function FloatingMapSearchBar({
                     </View>
                     <Pressable
                       onPress={onGo}
-                      disabled={!routeDistanceMeters}
+                      disabled={!activeDistanceMeters}
                       style={{
                         borderRadius: 14,
-                        backgroundColor: routeDistanceMeters ? Colors.accent : Colors.border,
+                        backgroundColor: activeDistanceMeters ? Colors.accent : Colors.border,
                         paddingHorizontal: 22,
                         paddingVertical: 12,
                       }}
