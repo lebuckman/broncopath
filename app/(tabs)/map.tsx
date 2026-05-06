@@ -455,6 +455,8 @@ export default function MapScreen() {
               routeWalkTimeSeconds={routeWalkTimeSeconds}
               onSelectStart={setStartBuilding}
               onSelectEnd={setEndBuilding}
+              onClearStart={() => setStartBuilding(null)}
+              onClearEnd={() => setEndBuilding(null)}
               onClearRoute={clearRoute}
               onGo={fitCameraToRoute}
               onLocateBuilding={handleLocateBuilding}
@@ -473,6 +475,7 @@ export default function MapScreen() {
         visible={sheetVisible}
         onClose={() => setSheetVisible(false)}
         activeFilters={activeFilters}
+        preloadedRooms={selected && !selectedGroupSections ? (roomsMap[selected.id] ?? []) : undefined}
         sections={selectedGroupSections}
         onSetRouteFrom={(b) => {
           setStartBuilding(b);

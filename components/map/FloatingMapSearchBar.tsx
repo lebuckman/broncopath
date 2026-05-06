@@ -48,6 +48,8 @@ type Props = {
   routeWalkTimeSeconds: number | null;
   onSelectStart: (b: Building) => void;
   onSelectEnd: (b: Building) => void;
+  onClearStart: () => void;
+  onClearEnd: () => void;
   onClearRoute: () => void;
   onGo: () => void;
   onLocateBuilding: (b: Building) => void;
@@ -73,6 +75,8 @@ export default function FloatingMapSearchBar({
   routeWalkTimeSeconds,
   onSelectStart,
   onSelectEnd,
+  onClearStart,
+  onClearEnd,
   onClearRoute,
   onGo,
   onLocateBuilding,
@@ -516,9 +520,11 @@ export default function FloatingMapSearchBar({
                 <Pressable
                   onPress={() => setActiveField("from")}
                   style={{
+                    flexDirection: "row",
+                    alignItems: "center",
                     paddingVertical: 12,
-                    paddingRight: 16,
                     paddingLeft: 14,
+                    paddingRight: 50,
                     borderBottomColor: Colors.border,
                     borderBottomWidth: 1,
                     borderLeftWidth: 3,
@@ -526,61 +532,83 @@ export default function FloatingMapSearchBar({
                     borderTopLeftRadius: 18,
                   }}
                 >
-                  <Text
-                    style={{
-                      color: activeField === "from" ? Colors.accent : Colors.muted,
-                      fontFamily: Fonts.bodyMedium,
-                      fontSize: 10,
-                      letterSpacing: 1.2,
-                      marginBottom: 3,
-                    }}
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={{
+                        color: activeField === "from" ? Colors.accent : Colors.muted,
+                        fontFamily: Fonts.bodyMedium,
+                        fontSize: 10,
+                        letterSpacing: 1.2,
+                        marginBottom: 3,
+                      }}
+                    >
+                      FROM
+                    </Text>
+                    <Text
+                      numberOfLines={1}
+                      style={{
+                        color: startBuilding ? Colors.text : Colors.muted,
+                        fontFamily: Fonts.bodySemiBold,
+                        fontSize: 13,
+                      }}
+                    >
+                      {startBuilding?.name ?? "Choose starting building"}
+                    </Text>
+                  </View>
+                  <Pressable
+                    onPress={onClearStart}
+                    disabled={!startBuilding}
+                    hitSlop={8}
+                    style={{ opacity: startBuilding ? 1 : 0 }}
                   >
-                    FROM
-                  </Text>
-                  <Text
-                    numberOfLines={1}
-                    style={{
-                      color: startBuilding ? Colors.text : Colors.muted,
-                      fontFamily: Fonts.bodySemiBold,
-                      fontSize: 13,
-                    }}
-                  >
-                    {startBuilding?.name ?? "Choose starting building"}
-                  </Text>
+                    <Feather name="x" size={12} color={Colors.muted} />
+                  </Pressable>
                 </Pressable>
 
                 <Pressable
                   onPress={() => setActiveField("to")}
                   style={{
+                    flexDirection: "row",
+                    alignItems: "center",
                     paddingVertical: 12,
-                    paddingRight: 16,
                     paddingLeft: 14,
+                    paddingRight: 50,
                     borderLeftWidth: 3,
                     borderLeftColor: activeField === "to" ? Colors.accent : "transparent",
                     borderBottomLeftRadius: 18,
                   }}
                 >
-                  <Text
-                    style={{
-                      color: activeField === "to" ? Colors.accent : Colors.muted,
-                      fontFamily: Fonts.bodyMedium,
-                      fontSize: 10,
-                      letterSpacing: 1.2,
-                      marginBottom: 3,
-                    }}
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={{
+                        color: activeField === "to" ? Colors.accent : Colors.muted,
+                        fontFamily: Fonts.bodyMedium,
+                        fontSize: 10,
+                        letterSpacing: 1.2,
+                        marginBottom: 3,
+                      }}
+                    >
+                      TO
+                    </Text>
+                    <Text
+                      numberOfLines={1}
+                      style={{
+                        color: endBuilding ? Colors.text : Colors.muted,
+                        fontFamily: Fonts.bodySemiBold,
+                        fontSize: 13,
+                      }}
+                    >
+                      {endBuilding?.name ?? "Choose destination"}
+                    </Text>
+                  </View>
+                  <Pressable
+                    onPress={onClearEnd}
+                    disabled={!endBuilding}
+                    hitSlop={8}
+                    style={{ opacity: endBuilding ? 1 : 0 }}
                   >
-                    TO
-                  </Text>
-                  <Text
-                    numberOfLines={1}
-                    style={{
-                      color: endBuilding ? Colors.text : Colors.muted,
-                      fontFamily: Fonts.bodySemiBold,
-                      fontSize: 13,
-                    }}
-                  >
-                    {endBuilding?.name ?? "Choose destination"}
-                  </Text>
+                    <Feather name="x" size={12} color={Colors.muted} />
+                  </Pressable>
                 </Pressable>
 
                 <Pressable

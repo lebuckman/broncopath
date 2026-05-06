@@ -26,7 +26,9 @@ export function useRooms(buildingId: string) {
         .finally(() => setLoading(false));
     }
 
-    if (!isRoomsCached(buildingId)) setLoading(true);
+    // Immediately swap to cached data for the new building (clears stale rooms from previous building)
+    setRooms(getCachedRooms(buildingId));
+    setLoading(!isRoomsCached(buildingId));
     setError(null);
     fetchRooms();
 
