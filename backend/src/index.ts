@@ -1,6 +1,8 @@
 import express from 'express';
 import cors from 'cors';
-import 'dotenv/config';
+import { config } from 'dotenv';
+config();
+config({ path: '.env.local', override: true });
 import buildingsRouter from './buildings.ts';
 import campusGraphRouter from "./campusGraph.ts";
 import schedulesRouter from "./schedules.ts";
