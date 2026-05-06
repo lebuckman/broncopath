@@ -10,7 +10,6 @@ import type { Building, Room } from "../../constants/mockData";
 import { useBuildings } from "../../hooks/useBuildings";
 import { useFavorites } from "../../hooks/useFavorites";
 import { useCampusGraph } from "../../hooks/useCampusGraph";
-import { useCongestion } from "../../hooks/useCongestion";
 import {
   getCachedBuildingsMemory,
   getCachedRoomsMemory,
@@ -74,6 +73,8 @@ export default function MapScreen() {
   const [roomsMap, setRoomsMap] = useState<Record<string, Room[]>>(() => {
     const map: Record<string, Room[]> = {};
 
+    getCachedBuildingsMemory().forEach((building) => {
+      map[building.id] = getCachedRoomsMemory(building.id);
     getCachedBuildingsMemory().forEach((building) => {
       map[building.id] = getCachedRoomsMemory(building.id);
     });
@@ -256,12 +257,32 @@ export default function MapScreen() {
           }
         }),
       );
+    let cancelled = false;
+
+    async function loadAllRooms() {
+      await Promise.all(
+        buildings.map(async (building) => {
+          try {
+            const rooms = await getRoomsCached(building.id);
+
+            if (!cancelled) {
+              setRoomsMap((prev) => ({
+                ...prev,
+                [building.id]: rooms,
+              }));
+            }
+          } catch {
+            // Ignore per-building room failures on the map.
+          }
+        }),
+      );
     }
 
     loadAllRooms();
 
-    const intervalId = setInterval(loadAllRooms, 300_000);
-    return () => clearInterval(intervalId);
+    return () => {
+      cancelled = true;
+    };
   }, [buildingIds, buildings]);
 
   useEffect(() => {
@@ -335,9 +356,13 @@ export default function MapScreen() {
 
     const lngCenter = (minLng + maxLng) / 2;
     const latCenter = (minLat + maxLat) / 2;
-    const maxDim = Math.max(maxLng - minLng, maxLat - minLat);
-    const rawZoom = Math.log2(360 / (maxDim * 2));
-    const zoom = Math.min(17, Math.max(15, rawZoom));
+    // calculate zoomCenter var based on the "box" that contains the route, so that it fits nicely on screen with some padding
+    const routeWidth = maxLng - minLng;
+    const routeHeight = maxLat - minLat;
+    const maxRouteDimension = Math.max(routeWidth, routeHeight);
+    const zoomCenter = Math.floor(
+      Math.log2(360 / (maxRouteDimension * .75)) - 1,
+    ); // 1.5 is padding factor
 
     cameraRef.current?.flyTo({
       center: [lngCenter, latCenter],
