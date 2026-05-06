@@ -721,7 +721,7 @@ export default function FloatingMapSearchBar({
                     gap: 8,
                     marginTop: 8,
                     marginHorizontal: 12,
-                    marginBottom: 4,
+                    marginBottom: 0,
                   }}
                 >
                   <Pressable
@@ -729,8 +729,9 @@ export default function FloatingMapSearchBar({
                     style={{
                       flex: 1,
                       borderRadius: 14,
-                      paddingVertical: 9,
+                      paddingVertical: 7,
                       paddingHorizontal: 12,
+                      alignItems: "center",
                       backgroundColor:
                         routeChoice === "shortest" ? Colors.accent : Colors.card,
                       borderColor: Colors.border,
@@ -744,17 +745,7 @@ export default function FloatingMapSearchBar({
                         fontSize: 12,
                       }}
                     >
-                      Shortest
-                    </Text>
-                    <Text
-                      style={{
-                        color: routeChoice === "shortest" ? Colors.bg : Colors.muted,
-                        fontFamily: Fonts.body,
-                        fontSize: 10,
-                        marginTop: 1,
-                      }}
-                    >
-                      Fastest walk
+                      Shortest walk
                     </Text>
                   </Pressable>
 
@@ -763,8 +754,9 @@ export default function FloatingMapSearchBar({
                     style={{
                       flex: 1,
                       borderRadius: 14,
-                      paddingVertical: 9,
+                      paddingVertical: 7,
                       paddingHorizontal: 12,
+                      alignItems: "center",
                       backgroundColor:
                         routeChoice === "leastCrowded" ? Colors.accent : Colors.card,
                       borderColor: Colors.border,
@@ -780,16 +772,6 @@ export default function FloatingMapSearchBar({
                     >
                       Least crowded
                     </Text>
-                    <Text
-                      style={{
-                        color: routeChoice === "leastCrowded" ? Colors.bg : Colors.muted,
-                        fontFamily: Fonts.body,
-                        fontSize: 10,
-                        marginTop: 1,
-                      }}
-                    >
-                      Avoids traffic
-                    </Text>
                   </Pressable>
                 </View>
               )}
@@ -803,7 +785,7 @@ export default function FloatingMapSearchBar({
                     borderColor: Colors.border,
                     borderWidth: 1,
                     padding: 14,
-                    marginTop: 8,
+                    marginTop: 4,
                     marginHorizontal: 12,
                   }}
                 >
