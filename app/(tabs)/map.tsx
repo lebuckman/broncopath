@@ -75,12 +75,9 @@ export default function MapScreen() {
 
     getCachedBuildingsMemory().forEach((building) => {
       map[building.id] = getCachedRoomsMemory(building.id);
-    getCachedBuildingsMemory().forEach((building) => {
-      map[building.id] = getCachedRoomsMemory(building.id);
     });
-
     return map;
-  });
+  })
 
   const [selected, setSelected] = useState<Building | null>(null);
   const [sheetVisible, setSheetVisible] = useState(false);
