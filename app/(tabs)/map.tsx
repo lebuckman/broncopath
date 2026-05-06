@@ -69,11 +69,7 @@ export default function MapScreen() {
 
   const { buildings, loading } = useBuildings();
   const { favorites } = useFavorites();
-  const {
-    graph,
-    refreshing: graphRefreshing,
-    error: graphError,
-  } = useCampusGraph();
+  const { graph } = useCampusGraph();
 
   const [roomsMap, setRoomsMap] = useState<Record<string, Room[]>>(() => {
     const map: Record<string, Room[]> = {};
@@ -156,7 +152,6 @@ export default function MapScreen() {
       setLeastCrowdedDistanceMeters(null);
       setLeastCrowdedWalkTimeSeconds(null);
       setRoutesAreDifferent(false);
-      setSelectedRouteGeoJSON(shortestGeoJSON);
       setRouteChoice("shortest");
       return;
     }
@@ -177,7 +172,6 @@ export default function MapScreen() {
       setLeastCrowdedDistanceMeters(null);
       setLeastCrowdedWalkTimeSeconds(null);
       setRoutesAreDifferent(false);
-      setSelectedRouteGeoJSON(shortestGeoJSON);
       setRouteChoice("shortest");
       return;
     }
@@ -188,23 +182,16 @@ export default function MapScreen() {
     setLeastCrowdedDistanceMeters(leastCrowded.totalDistance);
     setLeastCrowdedWalkTimeSeconds(leastCrowded.totalTime);
     setRoutesAreDifferent(true);
+  }, [routingGraph, startBuilding, endBuilding, congestion]);
 
-    setSelectedRouteGeoJSON(
-      routeChoice === "leastCrowded" ? leastCrowdedGeoJSON : shortestGeoJSON,
-    );
-  }, [routingGraph, startBuilding, endBuilding, congestion, routeChoice]);
-
+  // Derive selectedRouteGeoJSON from routeChoice without re-running Dijkstra
   useEffect(() => {
-    if (!graph) return;
-
-    console.log("Campus graph loaded", {
-      version: graph.version.id,
-      nodes: graph.nodes.length,
-      edges: graph.edges.length,
-      refreshing: graphRefreshing,
-      error: graphError,
-    });
-  }, [graph, graphRefreshing, graphError]);
+    setSelectedRouteGeoJSON(
+      routeChoice === "leastCrowded" && leastCrowdedRouteGeoJSON
+        ? leastCrowdedRouteGeoJSON
+        : shortestRouteGeoJSON,
+    );
+  }, [routeChoice, shortestRouteGeoJSON, leastCrowdedRouteGeoJSON]);
 
   useEffect(() => {
     if (!recenterMap) return;
