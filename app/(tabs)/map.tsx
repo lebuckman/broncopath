@@ -91,8 +91,8 @@ export default function MapScreen() {
       return;
     }
 
-    const startNode = findBuildingNode(routingGraph, startBuilding.id);
-    const endNode = findBuildingNode(routingGraph, endBuilding.id);
+    const startNode = findBuildingNode(routingGraph, startBuilding.id, startBuilding.latitude, startBuilding.longitude);
+    const endNode = findBuildingNode(routingGraph, endBuilding.id, endBuilding.latitude, endBuilding.longitude);
 
     console.log("Routing from/to", {
       startBuilding: startBuilding.id,
