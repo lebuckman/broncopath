@@ -82,7 +82,7 @@ export default function RoomsScreen() {
     }
 
     fetchAllRooms();
-    const id = setInterval(fetchAllRooms, 60_000);
+    const id = setInterval(fetchAllRooms, 300_000);
     return () => clearInterval(id);
   }, [buildingIds]);
 

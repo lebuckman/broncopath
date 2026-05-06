@@ -166,7 +166,7 @@ export default function MapScreen() {
 
     fetchAllRooms();
 
-    const intervalId = setInterval(fetchAllRooms, 60_000);
+    const intervalId = setInterval(fetchAllRooms, 300_000);
     return () => clearInterval(intervalId);
   }, [buildingIds, buildings]);
 
