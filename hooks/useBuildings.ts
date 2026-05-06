@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { AppState } from "react-native";
 import { getBuildings } from "../lib/api";
 import type { Building } from "../constants/mockData";
 import { getCachedBuildings, isBuildingsCached } from "../lib/dataCache";
@@ -9,6 +10,7 @@ export function useBuildings() {
   );
   const [loading, setLoading] = useState(() => !isBuildingsCached());
   const [error, setError] = useState<Error | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     function fetchBuildings() {
@@ -20,10 +22,29 @@ export function useBuildings() {
         .finally(() => setLoading(false));
     }
 
-    fetchBuildings();
+    function startPolling() {
+      fetchBuildings();
+      intervalRef.current = setInterval(fetchBuildings, 300_000);
+    }
 
-    const id = setInterval(fetchBuildings, 60_000);
-    return () => clearInterval(id);
+    function stopPolling() {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    }
+
+    startPolling();
+
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active") startPolling();
+      else stopPolling();
+    });
+
+    return () => {
+      stopPolling();
+      sub.remove();
+    };
   }, []);
 
   function refresh() {

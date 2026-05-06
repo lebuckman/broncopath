@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { AppState } from "react-native";
 import { getRooms } from "../lib/api";
 import type { Room } from "../constants/mockData";
 import { getCachedRooms, isRoomsCached } from "../lib/dataCache";
@@ -11,6 +12,7 @@ export function useRooms(buildingId: string) {
     buildingId ? !isRoomsCached(buildingId) : false,
   );
   const [error, setError] = useState<Error | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     if (!buildingId) {
@@ -26,14 +28,33 @@ export function useRooms(buildingId: string) {
         .finally(() => setLoading(false));
     }
 
+    function startPolling() {
+      fetchRooms();
+      intervalRef.current = setInterval(fetchRooms, 300_000);
+    }
+
+    function stopPolling() {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    }
+
     // Immediately swap to cached data for the new building (clears stale rooms from previous building)
     setRooms(getCachedRooms(buildingId));
     setLoading(!isRoomsCached(buildingId));
     setError(null);
-    fetchRooms();
+    startPolling();
 
-    const id = setInterval(fetchRooms, 60_000);
-    return () => clearInterval(id);
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active") startPolling();
+      else stopPolling();
+    });
+
+    return () => {
+      stopPolling();
+      sub.remove();
+    };
   }, [buildingId]);
 
   return { rooms, loading, error };
