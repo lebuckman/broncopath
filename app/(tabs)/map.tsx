@@ -25,8 +25,9 @@ import {
   type GeoJSONLine,
 } from "../../lib/routing/routeToGeoJSON";
 import { findBuildingNode } from "../../lib/routing/findBuildingNode";
+import mapStyle from "../../assets/map-style.json";
 
-const MAP_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
+const MAP_STYLE_URL = mapStyle as any;
 
 export default function MapScreen() {
   const { recenterMap, routeFrom, routeTo, viewBuilding } = useLocalSearchParams<{
