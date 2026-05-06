@@ -203,20 +203,30 @@ export default function MapScreen() {
     });
   }, [recenterMap]);
 
+  const appliedRouteFrom = useRef<string | null>(null);
+  const appliedRouteTo = useRef<string | null>(null);
+  const appliedViewBuilding = useRef<string | null>(null);
+
   useEffect(() => {
     if (!routeFrom || !buildings.length) return;
+    if (appliedRouteFrom.current === routeFrom) return;
+    appliedRouteFrom.current = routeFrom;
     const b = buildings.find((b) => b.id === (routeFrom as string).split("_")[0]);
     if (b) { setStartBuilding(b); setRouteSheetExpanded(true); }
   }, [routeFrom, buildings]);
 
   useEffect(() => {
     if (!routeTo || !buildings.length) return;
+    if (appliedRouteTo.current === routeTo) return;
+    appliedRouteTo.current = routeTo;
     const b = buildings.find((b) => b.id === (routeTo as string).split("_")[0]);
     if (b) { setEndBuilding(b); setRouteSheetExpanded(true); }
   }, [routeTo, buildings]);
 
   useEffect(() => {
     if (!viewBuilding || !buildings.length) return;
+    if (appliedViewBuilding.current === viewBuilding) return;
+    appliedViewBuilding.current = viewBuilding;
     const b = buildings.find((b) => b.id === (viewBuilding as string).split("_")[0]);
     if (!b) return;
     cameraRef.current?.flyTo({ center: [b.longitude, b.latitude], zoom: 17, duration: 500 });

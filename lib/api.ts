@@ -75,7 +75,7 @@ export async function getCampusGraphVersion(): Promise<CampusGraphVersion> {
 }
 
 export async function fetchClassSchedule(): Promise<ClassScheduleEntry[]> {
-  const res = await fetch("/api/schedule"); 
+  const res = await fetch(`${BASE_URL}/api/schedules`); // TODO: restore once congestion is server-side
   if (!res.ok) {
     throw new Error("Failed to fetch schedule");
   }

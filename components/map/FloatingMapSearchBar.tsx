@@ -321,6 +321,7 @@ export default function FloatingMapSearchBar({
       {/* Filter popup — separate card above the main card, always accessible */}
       {filtersVisible && (
         <Animated.View
+          pointerEvents={filtersOpen ? "auto" : "none"}
           style={{
             opacity: filterAnim,
             transform: [{ translateY: filterTranslate }],

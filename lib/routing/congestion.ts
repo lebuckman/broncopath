@@ -1,16 +1,7 @@
 import { dijkstra } from "./dijkstra";
 import { findBuildingNode } from "./findBuildingNode";
 import type { RoutingGraph, RoutingGraphEdge } from "./types";
-
-export type ClassScheduleEntry = {
-  id: string;
-  roomId: string;
-  buildingId: string;
-  dayOfWeek: string;
-  startTime: string; // "HH:mm"
-  endTime: string;   // "HH:mm"
-  enrollment?: number;
-};
+import type { ClassScheduleEntry } from "../api";
 
 export type CongestionMap = Record<string, Record<string, number>>;
 // edgeId -> timeWindow -> score
@@ -54,6 +45,7 @@ export function buildCongestionMap(
   const edgeCapacity = options.edgeCapacity ?? 80;
 
   const congestion: CongestionMap = {};
+  const routeCache = new Map<string, ReturnType<typeof dijkstra>>();
 
   const byDay = schedule.reduce<Record<string, ClassScheduleEntry[]>>((acc, entry) => {
     acc[entry.dayOfWeek] ??= [];
@@ -84,7 +76,12 @@ export function buildCongestionMap(
 
         if (!fromNode || !toNode) continue;
 
-        const route = dijkstra(graph, fromNode.id, toNode.id);
+        const cacheKey = `${fromNode.id}:${toNode.id}`;
+        let route = routeCache.get(cacheKey);
+        if (route === undefined) {
+          route = dijkstra(graph, fromNode.id, toNode.id);
+          routeCache.set(cacheKey, route);
+        }
         if (!route) continue;
 
         const movementCount = Math.min(
