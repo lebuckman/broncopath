@@ -603,6 +603,15 @@ def upsert_schedule_rows(database_url: str, rows: list[dict], semester: str):
 
     with psycopg.connect(database_url) as conn:
         with conn.cursor() as cur:
+            cur.execute("select id from rooms")
+            valid_room_ids = {row[0] for row in cur.fetchall()}
+
+        filtered = [row for row in deduped if row["roomId"] in valid_room_ids]
+        skipped_count = len(deduped) - len(filtered)
+        if skipped_count:
+            print(f"Skipped {skipped_count} schedule entries for missing rooms.")
+
+        with conn.cursor() as cur:
             cur.executemany(
                 """
                 insert into schedule_entries
@@ -621,13 +630,13 @@ def upsert_schedule_rows(database_url: str, rows: list[dict], semester: str):
                         row["courseName"],
                         row["semester"]
                     )
-                    for row in deduped
+                    for row in filtered
                 ],
             )
 
         conn.commit()
 
-    print(f"Inserted or skipped {len(deduped)} schedule entries for {semester}.")
+    print(f"Inserted or skipped {len(filtered)} schedule entries for {semester}.")
 
 
 def room_type_from_component(component: str) -> str:
