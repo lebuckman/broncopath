@@ -2,20 +2,35 @@ import { and, eq, lte, gte, gt } from "drizzle-orm";
 import { db } from "./db/index.ts";
 import { rooms, scheduleEntries } from "./db/schema.ts";
 
+const CAMPUS_TIME_ZONE = "America/Los_Angeles";
+
 export type DensityLevel = "low" | "med" | "high";
 
 export function getCurrentDayOfWeek(): string {
-  const days = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
-  const day = days[new Date().getDay()];
-  if (!day) throw new Error("Invalid day index");
-  return day;
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "short",
+    timeZone: CAMPUS_TIME_ZONE,
+  })
+    .format(new Date())
+    .toUpperCase();
 }
 
 export function getCurrentTimeHHMM(): string {
-  const now = new Date();
-  const hh = now.getHours();
-  const mm = now.getMinutes();
-  return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
+  const parts = new Intl.DateTimeFormat("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: CAMPUS_TIME_ZONE,
+  }).formatToParts(new Date());
+
+  const hour = parts.find((part) => part.type === "hour")?.value;
+  const minute = parts.find((part) => part.type === "minute")?.value;
+
+  if (!hour || !minute) {
+    throw new Error("Failed to resolve campus time");
+  }
+
+  return `${hour}:${minute}`;
 }
 
 export function to12Hour(time24: string): string {

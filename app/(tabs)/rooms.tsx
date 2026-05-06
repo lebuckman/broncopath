@@ -17,9 +17,14 @@ import { Fonts } from "../../constants/fonts";
 import type { Room } from "../../constants/mockData";
 import { useBuildings } from "../../hooks/useBuildings";
 import { useFavorites } from "../../hooks/useFavorites";
-import { getRooms } from "../../lib/api";
-import { getCachedBuildings, getCachedRooms } from "../../lib/dataCache";
+import {
+  getCachedBuildingsMemory,
+  getCachedRoomsMemory,
+  getRoomsCached,
+} from "../../lib/dataCache";
 import { applyRoomFilters, type FilterMode } from "../../lib/roomFilters";
+import { groupBuildingsByComplex } from "../../lib/buildingGroups";
+import type { BuildingSection } from "../../lib/buildingGroups";
 import BuildingAccordion from "../../components/building/BuildingAccordion";
 import BuildingAccordionSkeleton from "../../components/building/BuildingAccordionSkeleton";
 import GroupedChipFilter from "../../components/ui/GroupedChipFilter";
@@ -33,8 +38,8 @@ export default function RoomsScreen() {
   const { favorites } = useFavorites();
   const [roomsMap, setRoomsMap] = useState<Record<string, Room[]>>(() => {
     const map: Record<string, Room[]> = {};
-    getCachedBuildings().forEach((b) => {
-      map[b.id] = getCachedRooms(b.id);
+    getCachedBuildingsMemory().forEach((b) => {
+      map[b.id] = getCachedRoomsMemory(b.id);
     });
     return map;
   });
@@ -51,14 +56,15 @@ export default function RoomsScreen() {
   async function handleRefresh() {
     setRefreshing(true);
     try {
-      await Promise.all([
-        refresh(),
-        ...buildings.map((b) =>
-          getRooms(b.id).then((rooms) =>
-            setRoomsMap((prev) => ({ ...prev, [b.id]: rooms })),
-          ),
-        ),
-      ]);
+      const refreshedBuildings = await refresh();
+      const list = Array.isArray(refreshedBuildings) ? refreshedBuildings : buildings;
+
+      await Promise.all(
+        list.map(async (b) => {
+          const rooms = await getRoomsCached(b.id, { force: true });
+          setRoomsMap((prev) => ({ ...prev, [b.id]: rooms }));
+        }),
+      );
     } finally {
       setRefreshing(false);
     }
@@ -69,18 +75,21 @@ export default function RoomsScreen() {
   useEffect(() => {
     if (!buildingIds) return;
 
-    function fetchAllRooms() {
-      buildings.forEach((b) => {
-        getRooms(b.id)
-          .then((rooms) => {
+    async function fetchAllRooms() {
+      await Promise.all(
+        buildings.map(async (b) => {
+          try {
+            const rooms = await getRoomsCached(b.id, { force: true });
             setRoomsMap((prev) => ({ ...prev, [b.id]: rooms }));
-          })
-          .catch(() => {});
-      });
+          } catch {
+            // Ignore individual room fetch failures.
+          }
+        }),
+      );
     }
 
     fetchAllRooms();
-    const id = setInterval(fetchAllRooms, 60_000);
+    const id = setInterval(fetchAllRooms, 300_000);
     return () => clearInterval(id);
   }, [buildingIds]);
 
@@ -97,45 +106,68 @@ export default function RoomsScreen() {
 
   const trimmed = query.trim().toLowerCase();
 
-  const filteredBuildings = useMemo(() => {
-    return buildings
-      .map((b) => {
-        const allRooms = roomsMap[b.id] ?? [];
+  const buildingGroups = useMemo(() => groupBuildingsByComplex(buildings), [buildings]);
 
-        const chipFiltered =
-          activeFilters.length === 0
-            ? allRooms
-            : allRooms.filter((r) =>
-                applyRoomFilters(r, activeFilters, filterMode, favoriteIds),
+  const filteredBuildings = useMemo(() => {
+    const allGroupBuildings = (group: (typeof buildingGroups)[number]) => [
+      group.primary,
+      ...group.aliases,
+    ];
+
+    return buildingGroups
+      .map((group) => {
+        const groupBuilds = allGroupBuildings(group);
+        const buildingMatches =
+          searchMode === "buildings" && trimmed !== ""
+            ? groupBuilds.some(
+                (b) =>
+                  b.name.toLowerCase().includes(trimmed) ||
+                  b.code.toLowerCase().includes(trimmed),
+              )
+            : true;
+
+        const sections: BuildingSection[] = groupBuilds
+          .map((b) => {
+            const bRooms = roomsMap[b.id] ?? [];
+            const chipFiltered =
+              activeFilters.length === 0
+                ? bRooms
+                : bRooms.filter((r) =>
+                    applyRoomFilters(r, activeFilters, filterMode, favoriteIds),
+                  );
+
+            let filtered: Room[];
+            if (trimmed === "") {
+              filtered = chipFiltered;
+            } else if (searchMode === "buildings") {
+              filtered = buildingMatches ? chipFiltered : [];
+            } else {
+              filtered = chipFiltered.filter(
+                (r) =>
+                  r.number.toLowerCase().includes(trimmed) ||
+                  r.type.toLowerCase().includes(trimmed),
+              );
+            }
+
+            const sortedRooms = filtered
+              .slice()
+              .sort((a, b) =>
+                (a.number ?? "").localeCompare(b.number ?? "", undefined, {
+                  numeric: true,
+                }),
               );
 
-        let rooms: Room[];
-        if (trimmed === "") {
-          rooms = chipFiltered;
-        } else if (searchMode === "buildings") {
-          const buildingMatches =
-            b.name.toLowerCase().includes(trimmed) ||
-            b.code.toLowerCase().includes(trimmed);
-          rooms = buildingMatches ? chipFiltered : [];
-        } else {
-          rooms = chipFiltered.filter(
-            (r) =>
-              r.number.toLowerCase().includes(trimmed) ||
-              r.type.toLowerCase().includes(trimmed),
-          );
-        }
+            return { building: b, rooms: sortedRooms };
+          })
+          .filter((s) => s.rooms.length > 0);
 
-        const sortedRooms = rooms
-          .slice()
-          .sort((a, b) =>
-            a.number.localeCompare(b.number, undefined, { numeric: true }),
-          );
+        const allRooms = sections.flatMap((s) => s.rooms);
 
         return {
-          ...b,
-          rooms: sortedRooms,
-          freeCount: sortedRooms.filter((r: Room) => r.status === "free")
-            .length,
+          ...group.primary,
+          rooms: allRooms,
+          freeCount: allRooms.filter((r: Room) => r.status === "free").length,
+          sections: sections.length > 1 ? sections : undefined,
         };
       })
       .filter((b) => b.rooms.length > 0)
@@ -146,7 +178,7 @@ export default function RoomsScreen() {
         return a.code.localeCompare(b.code);
       });
   }, [
-    buildings,
+    buildingGroups,
     roomsMap,
     activeFilters,
     filterMode,
@@ -167,6 +199,7 @@ export default function RoomsScreen() {
         code={b.code}
         freeCount={b.freeCount}
         rooms={b.rooms}
+        sections={b.sections}
         forceExpanded={
           (searchMode === "rooms" && trimmed.length > 0) ||
           activeFilters.includes("Favorites")

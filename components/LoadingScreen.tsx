@@ -2,7 +2,7 @@ import { useRef, useState, useEffect } from "react";
 import { ActivityIndicator, Text, Animated } from "react-native";
 import { Colors } from "../constants/colors";
 import { Fonts } from "../constants/fonts";
-import { prefetchBuildings, prefetchRooms } from "../lib/dataCache";
+import { getBuildingsCached, getRoomsCached } from "../lib/dataCache";
 
 const FUNNY_LINES = [
   "Calculating optimal coffee run routes...",
@@ -44,8 +44,8 @@ export default function LoadingScreen({ onComplete }: Props) {
 
     const fetchPromise = (async () => {
       try {
-        await prefetchBuildings();
-        await prefetchRooms();
+        const buildings = await getBuildingsCached();
+        await Promise.all(buildings.map((b) => getRoomsCached(b.id)));
       } catch {
         // cache stays empty; hooks fall back to their own fetch/polling
       }
@@ -109,7 +109,7 @@ export default function LoadingScreen({ onComplete }: Props) {
           fontFamily: Fonts.mono,
           fontSize: 10,
           color: Colors.muted,
-          marginTop: 16,
+          marginTop: 35,
         }}
       >
         {msg}

@@ -39,7 +39,7 @@ export default function HomeScreen() {
     useState<Building | null>(null);
   const [showInfo, setShowInfo] = useState(false);
 
-  const favoriteBuildings = buildings.filter((b) =>
+  const favoriteBuildings = buildings?.filter((b) =>
     favoriteBuildingIds.includes(b.id),
   );
 
@@ -195,7 +195,7 @@ export default function HomeScreen() {
 
           <Pressable
             className="flex-1 rounded-xl p-5 border"
-            onPress={() => router.push("/(tabs)/route")}
+            onPress={() => router.push("/(tabs)/map")}
             onPressIn={() => setRoutePressed(true)}
             onPressOut={() => setRoutePressed(false)}
             style={{
@@ -229,6 +229,18 @@ export default function HomeScreen() {
         building={favoriteSheetBuilding}
         visible={favoriteSheetBuilding !== null}
         onClose={() => setFavoriteSheetBuilding(null)}
+        onSetRouteFrom={(b) => {
+          setFavoriteSheetBuilding(null);
+          router.push(`/(tabs)/map?routeFrom=${b.id}_${Date.now()}` as any);
+        }}
+        onSetRouteTo={(b) => {
+          setFavoriteSheetBuilding(null);
+          router.push(`/(tabs)/map?routeTo=${b.id}_${Date.now()}` as any);
+        }}
+        onViewOnMap={(b) => {
+          setFavoriteSheetBuilding(null);
+          router.push(`/(tabs)/map?viewBuilding=${b.id}_${Date.now()}` as any);
+        }}
       />
 
       <InfoModal visible={showInfo} onClose={() => setShowInfo(false)} />

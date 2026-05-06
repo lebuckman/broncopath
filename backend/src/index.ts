@@ -1,7 +1,11 @@
 import express from 'express';
 import cors from 'cors';
-import 'dotenv/config';
+import { config } from 'dotenv';
+config();
+config({ path: '.env.local', override: true });
 import buildingsRouter from './buildings.ts';
+import campusGraphRouter from "./campusGraph.ts";
+import schedulesRouter from "./schedules.ts";
 
 const app = express();
 const PORT = process.env.PORT ?? 3000;
@@ -14,6 +18,10 @@ app.get('/api/health', (_req, res) => {
 });
 
 app.use('/api/buildings', buildingsRouter);
+
+app.use("/api/campus-graph", campusGraphRouter);
+
+app.use("/api/schedules", schedulesRouter);
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

@@ -1,16 +1,21 @@
-import { useState, useEffect } from "react";
-import { getRooms } from "../lib/api";
+import { useState, useEffect, useRef } from "react";
+import { AppState } from "react-native";
 import type { Room } from "../constants/mockData";
-import { getCachedRooms, isRoomsCached } from "../lib/dataCache";
+import {
+  getRoomsCached,
+  getCachedRoomsMemory,
+  isRoomsCachedMemory,
+} from "../lib/dataCache";
 
 export function useRooms(buildingId: string) {
   const [rooms, setRooms] = useState<Room[]>(() =>
-    buildingId ? getCachedRooms(buildingId) : [],
+    buildingId ? getCachedRoomsMemory(buildingId) : [],
   );
   const [loading, setLoading] = useState(() =>
-    buildingId ? !isRoomsCached(buildingId) : false,
+    buildingId ? !isRoomsCachedMemory(buildingId) : false,
   );
   const [error, setError] = useState<Error | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     if (!buildingId) {
@@ -19,19 +24,45 @@ export function useRooms(buildingId: string) {
       return;
     }
 
-    function fetchRooms() {
-      getRooms(buildingId)
-        .then(setRooms)
-        .catch(setError)
-        .finally(() => setLoading(false));
+    async function fetchRooms(force = false) {
+      try {
+        const result = await getRoomsCached(buildingId, { force });
+        setRooms(result);
+        setError(null);
+      } catch (err) {
+        setError(err instanceof Error ? err : new Error("Failed to fetch rooms"));
+      } finally {
+        setLoading(false);
+      }
     }
 
-    if (!isRoomsCached(buildingId)) setLoading(true);
-    setError(null);
-    fetchRooms();
+    function startPolling() {
+      // Immediately show cached data for this building before network fetch
+      setRooms(getCachedRoomsMemory(buildingId));
+      setLoading(!isRoomsCachedMemory(buildingId));
+      setError(null);
+      fetchRooms();
+      intervalRef.current = setInterval(() => fetchRooms(true), 300_000);
+    }
 
-    const id = setInterval(fetchRooms, 60_000);
-    return () => clearInterval(id);
+    function stopPolling() {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    }
+
+    startPolling();
+
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active") startPolling();
+      else stopPolling();
+    });
+
+    return () => {
+      stopPolling();
+      sub.remove();
+    };
   }, [buildingId]);
 
   return { rooms, loading, error };
