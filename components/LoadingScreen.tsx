@@ -109,7 +109,7 @@ export default function LoadingScreen({ onComplete }: Props) {
           fontFamily: Fonts.mono,
           fontSize: 10,
           color: Colors.muted,
-          marginTop: 16,
+          marginTop: 35,
         }}
       >
         {msg}
