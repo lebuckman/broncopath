@@ -35,7 +35,6 @@ import {
   getRouteProgress,
   USER_LOCATION_NODE_ID,
 } from "../../lib/routing/userLocationRouting";
-import { useCongestion } from "../../hooks/useCongestion";
 import { findBuildingNode } from "../../lib/routing/findBuildingNode";
 import mapStyle from "../../assets/map-style.json";
 import type { RoutingGraphEdge } from "../../lib/routing/types";
@@ -118,8 +117,6 @@ export default function MapScreen() {
   const [shortestRouteGeoJSON, setShortestRouteGeoJSON] =
     useState<GeoJSONLine | null>(null);
   const [leastCrowdedRouteGeoJSON, setLeastCrowdedRouteGeoJSON] =
-    useState<GeoJSONLine | null>(null);
-  const [selectedRouteGeoJSON, setSelectedRouteGeoJSON] =
     useState<GeoJSONLine | null>(null);
   const [shortestDistanceMeters, setShortestDistanceMeters] = useState<
     number | null
