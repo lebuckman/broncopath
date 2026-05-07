@@ -14,7 +14,11 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.broncopath"
+      "bundleIdentifier": "com.anonymous.broncopath",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "BroncoPath uses your location to show where you are on campus and route you to your destination.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "BroncoPath uses your location to show where you are on campus and route you to your destination."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -28,9 +32,6 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "plugins": [
-      "expo-router",
-      "@maplibre/maplibre-react-native"
-    ]
+    "plugins": ["expo-router", "@maplibre/maplibre-react-native"]
   }
 }

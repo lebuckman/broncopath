@@ -29,11 +29,20 @@ import {
   routeToLineString,
   type GeoJSONLine,
 } from "../../lib/routing/routeToGeoJSON";
+import { useUserLocation } from "../../hooks/useUserLocation";
+import {
+  buildGraphWithUserLocation,
+  getRouteProgress,
+  USER_LOCATION_NODE_ID,
+} from "../../lib/routing/userLocationRouting";
+import { useCongestion } from "../../hooks/useCongestion";
 import { findBuildingNode } from "../../lib/routing/findBuildingNode";
 import mapStyle from "../../assets/map-style.json";
 import type { RoutingGraphEdge } from "../../lib/routing/types";
 
 const MAP_STYLE_URL = mapStyle as any;
+const REROUTE_DISTANCE_METERS = 18;
+
 type RouteChoice = "shortest" | "leastCrowded";
 
 function getCurrentTimeHHMM() {
@@ -49,6 +58,62 @@ function areSameRoute(a: RoutingGraphEdge[], b: RoutingGraphEdge[]) {
 }
 
 export default function MapScreen() {
+  const userLocation = useUserLocation(3);
+  const [useCurrentLocationAsStart, setUseCurrentLocationAsStart] =
+    useState(true);
+  const [routeSeedLocation, setRouteSeedLocation] = useState<
+    [number, number] | null
+  >(null);
+  const [routeProgress, setRouteProgress] = useState<any | null>(null);
+  const [selectedRouteGeoJSON, setSelectedRouteGeoJSON] =
+    useState<GeoJSONLine | null>(null);
+
+  // 1. Seed route from GPS once
+  useEffect(() => {
+    if (!useCurrentLocationAsStart) return;
+    if (!userLocation.lngLat) return;
+    if (routeSeedLocation) return;
+
+    setRouteSeedLocation(userLocation.lngLat);
+  }, [useCurrentLocationAsStart, userLocation.lngLat, routeSeedLocation]);
+
+  // 2. Clear GPS route state when leaving GPS mode
+  useEffect(() => {
+    if (!useCurrentLocationAsStart) {
+      setRouteSeedLocation(null);
+      setRouteProgress(null);
+    }
+  }, [useCurrentLocationAsStart]);
+
+  // 3. Track progress / reroute
+  useEffect(() => {
+    if (!useCurrentLocationAsStart) return;
+    if (!userLocation.lngLat || !selectedRouteGeoJSON) return;
+
+    const progress = getRouteProgress(
+      userLocation.lngLat,
+      selectedRouteGeoJSON.geometry.coordinates,
+    );
+
+    setRouteProgress(progress);
+
+    const hasUsableAccuracy =
+      userLocation.accuracyMeters === null || userLocation.accuracyMeters <= 35;
+
+    if (
+      progress &&
+      progress.distanceToRouteMeters > REROUTE_DISTANCE_METERS &&
+      hasUsableAccuracy
+    ) {
+      setRouteSeedLocation(userLocation.lngLat);
+    }
+  }, [
+    useCurrentLocationAsStart,
+    userLocation.lngLat,
+    userLocation.accuracyMeters,
+    selectedRouteGeoJSON,
+  ]);
+
   const [routeChoice, setRouteChoice] = useState<RouteChoice>("shortest");
   const [shortestRouteGeoJSON, setShortestRouteGeoJSON] =
     useState<GeoJSONLine | null>(null);
@@ -110,7 +175,11 @@ export default function MapScreen() {
   const { congestion } = useCongestion(routingGraph);
 
   useEffect(() => {
-    if (!routingGraph || !startBuilding || !endBuilding) {
+    if (
+      !routingGraph ||
+      !endBuilding ||
+      (!useCurrentLocationAsStart && !startBuilding)
+    ) {
       setShortestRouteGeoJSON(null);
       setLeastCrowdedRouteGeoJSON(null);
       setSelectedRouteGeoJSON(null);
@@ -122,20 +191,55 @@ export default function MapScreen() {
       return;
     }
 
-    const startNode = findBuildingNode(
-      routingGraph,
-      startBuilding.id,
-      startBuilding.latitude,
-      startBuilding.longitude,
-    );
+    let graphForRoute = routingGraph;
+    let startNodeId: string | null = null;
+
+    if (useCurrentLocationAsStart) {
+      if (!routeSeedLocation) {
+        setSelectedRouteGeoJSON(null);
+        setShortestDistanceMeters(null);
+        return;
+      }
+
+      const result = buildGraphWithUserLocation(
+        routingGraph,
+        routeSeedLocation,
+      );
+
+      if (!result.projection) {
+        setSelectedRouteGeoJSON(null);
+        setShortestDistanceMeters(null);
+        return;
+      }
+
+      graphForRoute = result.graph;
+      startNodeId = USER_LOCATION_NODE_ID;
+
+    } else {
+      if (!startBuilding) {
+        setSelectedRouteGeoJSON(null);
+        setShortestDistanceMeters(null);
+        return;
+      }
+
+      const startNode = findBuildingNode(
+        graphForRoute,
+        startBuilding.id,
+        startBuilding.latitude,
+        startBuilding.longitude,
+      );
+
+      startNodeId = startNode?.id ?? null;
+    }
+
     const endNode = findBuildingNode(
-      routingGraph,
+      graphForRoute,
       endBuilding.id,
       endBuilding.latitude,
       endBuilding.longitude,
     );
 
-    if (!startNode || !endNode) {
+    if (!startNodeId || !endNode) {
       setShortestRouteGeoJSON(null);
       setLeastCrowdedRouteGeoJSON(null);
       setSelectedRouteGeoJSON(null);
@@ -147,7 +251,7 @@ export default function MapScreen() {
       return;
     }
 
-    const shortest = dijkstra(routingGraph, startNode.id, endNode.id);
+    const shortest = dijkstra(graphForRoute, startNodeId, endNode.id);
 
     if (!shortest) {
       setShortestRouteGeoJSON(null);
@@ -177,8 +281,8 @@ export default function MapScreen() {
     }
 
     const leastCrowded = dijkstraLeastCrowded(
-      routingGraph,
-      startNode.id,
+      graphForRoute,
+      startNodeId,
       endNode.id,
       congestion,
       {
@@ -202,7 +306,14 @@ export default function MapScreen() {
     setLeastCrowdedDistanceMeters(leastCrowded.totalDistance);
     setLeastCrowdedWalkTimeSeconds(leastCrowded.totalTime);
     setRoutesAreDifferent(true);
-  }, [routingGraph, startBuilding, endBuilding, congestion]);
+  }, [
+    routingGraph,
+    startBuilding,
+    endBuilding,
+    congestion,
+    useCurrentLocationAsStart,
+    routeSeedLocation,
+  ]);
 
   // Derive selectedRouteGeoJSON from routeChoice without re-running Dijkstra
   useEffect(() => {
@@ -355,6 +466,11 @@ export default function MapScreen() {
     setLeastCrowdedDistanceMeters(null);
     setLeastCrowdedWalkTimeSeconds(null);
 
+    setRouteSeedLocation(null);
+    setRouteProgress(null);
+
+    setUseCurrentLocationAsStart(true);
+
     setRoutesAreDifferent(false);
   }
   function fitCameraToRoute() {
@@ -451,6 +567,13 @@ export default function MapScreen() {
                   center: [CPP_REGION.longitude, CPP_REGION.latitude],
                   zoom: 16,
                 }}
+              />
+
+              <MLRN.UserLocation
+                animated
+                accuracy
+                heading
+                minDisplacement={3}
               />
 
               {leastCrowdedRouteGeoJSON && (
@@ -607,6 +730,56 @@ export default function MapScreen() {
               />
             )}
 
+            {selectedRouteGeoJSON &&
+              routeProgress &&
+              useCurrentLocationAsStart &&
+              !routeSheetExpanded && (
+                <View
+                  pointerEvents="none"
+                  style={{
+                    position: "absolute",
+                    left: 16,
+                    right: 16,
+                    bottom: 92,
+                    zIndex: 24,
+                    borderRadius: 18,
+                    padding: 12,
+                    backgroundColor: "rgba(20, 24, 31, 0.88)",
+                    borderColor: Colors.border,
+                    borderWidth: 1,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: Colors.text,
+                      fontFamily: Fonts.bodySemiBold,
+                      fontSize: 13,
+                    }}
+                  >
+                    {Math.round(routeProgress.remainingDistanceMeters)} m
+                    remaining
+                  </Text>
+
+                  <View
+                    style={{
+                      marginTop: 8,
+                      height: 5,
+                      borderRadius: 999,
+                      backgroundColor: Colors.border,
+                      overflow: "hidden",
+                    }}
+                  >
+                    <View
+                      style={{
+                        height: 5,
+                        width: `${Math.round(routeProgress.progress * 100)}%`,
+                        backgroundColor: Colors.accent,
+                      }}
+                    />
+                  </View>
+                </View>
+              )}
+
             <FloatingMapSearchBar
               activeFilters={activeFilters}
               filterMode={filterMode}
@@ -625,7 +798,6 @@ export default function MapScreen() {
               shortestWalkTimeSeconds={shortestWalkTimeSeconds}
               leastCrowdedDistanceMeters={leastCrowdedDistanceMeters}
               leastCrowdedWalkTimeSeconds={leastCrowdedWalkTimeSeconds}
-              onSelectStart={setStartBuilding}
               onSelectEnd={setEndBuilding}
               onClearStart={() => setStartBuilding(null)}
               onClearEnd={() => setEndBuilding(null)}
@@ -635,6 +807,20 @@ export default function MapScreen() {
               routeActive={selectedRouteGeoJSON !== null && !routeSheetExpanded}
               markersHidden={markersHidden}
               onToggleMarkersHidden={() => setMarkersHidden((p) => !p)}
+              useCurrentLocationAsStart={useCurrentLocationAsStart}
+              userLocationAvailable={
+                !!userLocation.lngLat && userLocation.permissionGranted === true
+              }
+              onUseCurrentLocationAsStart={() => {
+                setUseCurrentLocationAsStart(true);
+                setStartBuilding(null);
+                setRouteSeedLocation(userLocation.lngLat);
+              }}
+              onSelectStart={(building) => {
+                setUseCurrentLocationAsStart(false);
+                setRouteSeedLocation(null);
+                setStartBuilding(building);
+              }}
             />
           </>
         )}

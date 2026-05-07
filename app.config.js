@@ -3,7 +3,7 @@ module.exports = {
     name: "broncopath",
     slug: "broncopath",
     scheme: "broncopath",
-    newArchEnabled: false,
+    //newArchEnabled: true,
     version: "1.0.0",
     orientation: "portrait",
     icon: "./assets/icon.png",
