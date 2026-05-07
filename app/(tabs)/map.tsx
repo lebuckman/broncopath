@@ -10,6 +10,7 @@ import type { Building, Room } from "../../constants/mockData";
 import { useBuildings } from "../../hooks/useBuildings";
 import { useFavorites } from "../../hooks/useFavorites";
 import { useCampusGraph } from "../../hooks/useCampusGraph";
+import { useCongestion } from "../../hooks/useCongestion";
 import {
   getCachedBuildingsMemory,
   getCachedRoomsMemory,
@@ -117,6 +118,8 @@ export default function MapScreen() {
   const [shortestRouteGeoJSON, setShortestRouteGeoJSON] =
     useState<GeoJSONLine | null>(null);
   const [leastCrowdedRouteGeoJSON, setLeastCrowdedRouteGeoJSON] =
+    useState<GeoJSONLine | null>(null);
+  const [selectedRouteGeoJSON, setSelectedRouteGeoJSON] =
     useState<GeoJSONLine | null>(null);
   const [shortestDistanceMeters, setShortestDistanceMeters] = useState<
     number | null
@@ -487,9 +490,10 @@ export default function MapScreen() {
     const routeWidth = maxLng - minLng;
     const routeHeight = maxLat - minLat;
     const maxRouteDimension = Math.max(routeWidth, routeHeight);
-    const zoomCenter = Math.floor(
-      Math.log2(360 / (maxRouteDimension * 0.75)) - 1,
-    ); // 1.5 is padding factor
+    const zoomCenter = Math.min(
+      17,
+      Math.max(14, Math.floor(Math.log2(360 / (maxRouteDimension * 0.75)) - 1)),
+    );
 
     cameraRef.current?.flyTo({
       center: [lngCenter, latCenter],
