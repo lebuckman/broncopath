@@ -1,6 +1,6 @@
 import type { Building, Room, RouteOption } from '../constants/mockData';
 
-const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://localhost:3000';
+const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://10.110.212.218:3000';
 
 export async function getBuildings(): Promise<Building[]> {
   const response = await fetch(`${BASE_URL}/api/buildings`);
