@@ -62,6 +62,9 @@ type Props = {
   routeActive: boolean;
   markersHidden: boolean;
   onToggleMarkersHidden: () => void;
+  useCurrentLocationAsStart: boolean;
+  userLocationAvailable: boolean;
+  onUseCurrentLocationAsStart: () => void;
 };
 
 export default function FloatingMapSearchBar({
@@ -92,6 +95,9 @@ export default function FloatingMapSearchBar({
   routeActive,
   markersHidden,
   onToggleMarkersHidden,
+  useCurrentLocationAsStart,
+  userLocationAvailable,
+  onUseCurrentLocationAsStart,
 }: Props) {
   // Content area: grows below the bar
   const contentHeightAnim = useRef(new Animated.Value(0)).current;
@@ -104,10 +110,14 @@ export default function FloatingMapSearchBar({
   const filterAnim = useRef(new Animated.Value(0)).current;
 
   // Route pill
-  const pillAnim = useRef(new Animated.Value(routeActive && !expanded ? 1 : 0)).current;
+  const pillAnim = useRef(
+    new Animated.Value(routeActive && !expanded ? 1 : 0),
+  ).current;
   const [pillVisible, setPillVisible] = useState(routeActive && !expanded);
 
-  const [activeField, setActiveField] = useState<RouteField>("from");
+  const [activeField, setActiveField] = useState<RouteField>(
+    userLocationAvailable ? "to" : "from",
+  );
   const [query, setQuery] = useState("");
   const inputRef = useRef<TextInput>(null);
   const listRef = useRef<ScrollView>(null);
@@ -132,19 +142,25 @@ export default function FloatingMapSearchBar({
       Animated.timing(contentHeightAnim, {
         toValue: opening ? SCREEN_H * 0.58 : 0,
         duration: opening ? 300 : 220,
-        easing: opening ? Easing.out(Easing.poly(3)) : Easing.in(Easing.poly(2)),
+        easing: opening
+          ? Easing.out(Easing.poly(3))
+          : Easing.in(Easing.poly(2)),
         useNativeDriver: false,
       }),
       Animated.timing(contentOpacityAnim, {
         toValue: opening ? 1 : 0,
         duration: opening ? 240 : 160,
-        easing: opening ? Easing.out(Easing.poly(3)) : Easing.in(Easing.poly(2)),
+        easing: opening
+          ? Easing.out(Easing.poly(3))
+          : Easing.in(Easing.poly(2)),
         useNativeDriver: true,
       }),
       Animated.timing(handleHeightAnim, {
         toValue: opening ? 20 : 0,
         duration: opening ? 220 : 180,
-        easing: opening ? Easing.out(Easing.poly(3)) : Easing.in(Easing.poly(2)),
+        easing: opening
+          ? Easing.out(Easing.poly(3))
+          : Easing.in(Easing.poly(2)),
         useNativeDriver: false,
       }),
     ]).start();
@@ -187,7 +203,11 @@ export default function FloatingMapSearchBar({
     const shouldShow = routeActive && !expanded;
     if (shouldShow) {
       setPillVisible(true);
-      Animated.timing(pillAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+      Animated.timing(pillAnim, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
     } else {
       Animated.timing(pillAnim, {
         toValue: 0,
@@ -200,6 +220,25 @@ export default function FloatingMapSearchBar({
   useEffect(() => {
     listRef.current?.scrollTo({ y: 0, animated: false });
   }, [query]);
+
+  useEffect(() => {
+    if (!expanded) return;
+
+    if (userLocationAvailable && useCurrentLocationAsStart && !endBuilding) {
+      setActiveField("to");
+      return;
+    }
+
+    if (!userLocationAvailable && !startBuilding) {
+      setActiveField("from");
+    }
+  }, [
+    expanded,
+    userLocationAvailable,
+    useCurrentLocationAsStart,
+    startBuilding,
+    endBuilding,
+  ]);
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -231,9 +270,13 @@ export default function FloatingMapSearchBar({
   }
 
   const activeDistanceMeters =
-    routeChoice === "leastCrowded" ? leastCrowdedDistanceMeters : shortestDistanceMeters;
+    routeChoice === "leastCrowded"
+      ? leastCrowdedDistanceMeters
+      : shortestDistanceMeters;
   const activeWalkTimeSeconds =
-    routeChoice === "leastCrowded" ? leastCrowdedWalkTimeSeconds : shortestWalkTimeSeconds;
+    routeChoice === "leastCrowded"
+      ? leastCrowdedWalkTimeSeconds
+      : shortestWalkTimeSeconds;
   const minutes =
     activeWalkTimeSeconds != null
       ? Math.max(1, Math.round(activeWalkTimeSeconds / 60))
@@ -248,16 +291,30 @@ export default function FloatingMapSearchBar({
   }, [activeFilters]);
 
   const hasActiveFilters = activeFilters.length > 0;
-  const canSwap = !!startBuilding && !!endBuilding;
-  const showSummary = !!startBuilding && !!endBuilding;
+  const hasRouteStart = useCurrentLocationAsStart || !!startBuilding;
+  const canSwap =
+    !!startBuilding && !!endBuilding && !useCurrentLocationAsStart;
+  const showSummary = hasRouteStart && !!endBuilding;
 
-  const filterTranslate = filterAnim.interpolate({ inputRange: [0, 1], outputRange: [8, 0] });
-  const pillTranslate = pillAnim.interpolate({ inputRange: [0, 1], outputRange: [8, 0] });
+  const filterTranslate = filterAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [8, 0],
+  });
+  const pillTranslate = pillAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [8, 0],
+  });
 
   return (
     <View
       pointerEvents="box-none"
-      style={{ position: "absolute", bottom: 20, left: 16, right: 16, zIndex: 30 }}
+      style={{
+        position: "absolute",
+        bottom: 20,
+        left: 16,
+        right: 16,
+        zIndex: 30,
+      }}
     >
       {/* Route pill — right-aligned, above everything */}
       {pillVisible && (
@@ -290,13 +347,30 @@ export default function FloatingMapSearchBar({
               }}
             >
               <View
-                style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: Colors.accent }}
+                style={{
+                  width: 7,
+                  height: 7,
+                  borderRadius: 3.5,
+                  backgroundColor: Colors.accent,
+                }}
               />
-              <Text style={{ color: Colors.text, fontFamily: Fonts.bodyMedium, fontSize: 12 }}>
+              <Text
+                style={{
+                  color: Colors.text,
+                  fontFamily: Fonts.bodyMedium,
+                  fontSize: 12,
+                }}
+              >
                 {minutes != null ? `${minutes} min` : "Route active"}
               </Text>
               {meters != null && (
-                <Text style={{ color: Colors.muted, fontFamily: Fonts.body, fontSize: 12 }}>
+                <Text
+                  style={{
+                    color: Colors.muted,
+                    fontFamily: Fonts.body,
+                    fontSize: 12,
+                  }}
+                >
                   · {meters} m
                 </Text>
               )}
@@ -307,7 +381,11 @@ export default function FloatingMapSearchBar({
                   color={markersHidden ? Colors.accent : Colors.muted}
                 />
               </Pressable>
-              <Pressable onPress={() => onExpandedChange(true)} hitSlop={8} style={{ marginLeft: 2 }}>
+              <Pressable
+                onPress={() => onExpandedChange(true)}
+                hitSlop={8}
+                style={{ marginLeft: 2 }}
+              >
                 <Feather name="edit-2" size={13} color={Colors.muted} />
               </Pressable>
               <Pressable onPress={onClearRoute} hitSlop={8}>
@@ -350,7 +428,11 @@ export default function FloatingMapSearchBar({
               }}
             >
               <Text
-                style={{ color: Colors.text, fontFamily: Fonts.bodySemiBold, fontSize: 13 }}
+                style={{
+                  color: Colors.text,
+                  fontFamily: Fonts.bodySemiBold,
+                  fontSize: 13,
+                }}
               >
                 {filterLabel}
               </Text>
@@ -367,14 +449,16 @@ export default function FloatingMapSearchBar({
                   style={{
                     paddingHorizontal: 10,
                     paddingVertical: 5,
-                    backgroundColor: filterMode === "any" ? Colors.accentBg : "transparent",
+                    backgroundColor:
+                      filterMode === "any" ? Colors.accentBg : "transparent",
                   }}
                 >
                   <Text
                     style={{
                       fontSize: 11,
                       fontFamily: Fonts.bodyMedium,
-                      color: filterMode === "any" ? Colors.accent : Colors.muted,
+                      color:
+                        filterMode === "any" ? Colors.accent : Colors.muted,
                     }}
                   >
                     Any
@@ -385,14 +469,16 @@ export default function FloatingMapSearchBar({
                   style={{
                     paddingHorizontal: 10,
                     paddingVertical: 5,
-                    backgroundColor: filterMode === "all" ? Colors.accentBg : "transparent",
+                    backgroundColor:
+                      filterMode === "all" ? Colors.accentBg : "transparent",
                   }}
                 >
                   <Text
                     style={{
                       fontSize: 11,
                       fontFamily: Fonts.bodyMedium,
-                      color: filterMode === "all" ? Colors.accent : Colors.muted,
+                      color:
+                        filterMode === "all" ? Colors.accent : Colors.muted,
                     }}
                   >
                     All
@@ -427,13 +513,20 @@ export default function FloatingMapSearchBar({
         }}
       >
         {/* Drag handle — only occupies space when menu is expanded */}
-        <Animated.View style={{ maxHeight: handleHeightAnim, overflow: "hidden" }}>
+        <Animated.View
+          style={{ maxHeight: handleHeightAnim, overflow: "hidden" }}
+        >
           <View
             style={{ alignItems: "center", paddingTop: 8, paddingBottom: 6 }}
             {...panResponder.panHandlers}
           >
             <View
-              style={{ width: 40, height: 4, borderRadius: 999, backgroundColor: Colors.borderMd }}
+              style={{
+                width: 40,
+                height: 4,
+                borderRadius: 999,
+                backgroundColor: Colors.borderMd,
+              }}
             />
           </View>
         </Animated.View>
@@ -475,8 +568,8 @@ export default function FloatingMapSearchBar({
                 !expanded
                   ? "Search buildings or plan a route"
                   : activeField === "from"
-                  ? "Search starting building…"
-                  : "Search destination…"
+                    ? "Search starting building…"
+                    : "Search destination…"
               }
               placeholderTextColor={Colors.muted}
               style={{
@@ -502,22 +595,29 @@ export default function FloatingMapSearchBar({
                 hasActiveFilters || filtersOpen
                   ? Colors.accentBg
                   : "rgba(255,255,255,0.07)",
-              borderColor: hasActiveFilters || filtersOpen ? Colors.accent : Colors.border,
+              borderColor:
+                hasActiveFilters || filtersOpen ? Colors.accent : Colors.border,
               borderWidth: 1,
             }}
           >
             <Feather
               name="sliders"
               size={16}
-              color={hasActiveFilters || filtersOpen ? Colors.accent : Colors.text}
+              color={
+                hasActiveFilters || filtersOpen ? Colors.accent : Colors.text
+              }
             />
           </Pressable>
         </View>
 
         {/* Expandable content — no separator, flows directly from bar */}
-        <Animated.View style={{ maxHeight: contentHeightAnim, overflow: "hidden" }}>
+        <Animated.View
+          style={{ maxHeight: contentHeightAnim, overflow: "hidden" }}
+        >
           <Animated.View style={{ opacity: contentOpacityAnim }}>
-            <View style={{ paddingHorizontal: 8, paddingTop: 4, paddingBottom: 16 }}>
+            <View
+              style={{ paddingHorizontal: 8, paddingTop: 4, paddingBottom: 16 }}
+            >
               {/* FROM / TO card */}
               <View
                 style={{
@@ -540,14 +640,20 @@ export default function FloatingMapSearchBar({
                     borderBottomColor: Colors.border,
                     borderBottomWidth: 1,
                     borderLeftWidth: 3,
-                    borderLeftColor: activeField === "from" ? Colors.accent : "transparent",
+                    borderLeftColor:
+                      activeField === "from" ? Colors.accent : "transparent",
                     borderTopLeftRadius: 18,
                   }}
                 >
                   <View style={{ flex: 1 }}>
                     <Text
                       style={{
-                        color: activeField === "from" ? Colors.accent : Colors.muted,
+                        color:
+                          useCurrentLocationAsStart && userLocationAvailable
+                            ? Colors.text
+                            : startBuilding
+                              ? Colors.text
+                              : Colors.muted,
                         fontFamily: Fonts.bodyMedium,
                         fontSize: 10,
                         letterSpacing: 1.2,
@@ -564,7 +670,11 @@ export default function FloatingMapSearchBar({
                         fontSize: 13,
                       }}
                     >
-                      {startBuilding?.name ?? "Choose starting building"}
+                      {useCurrentLocationAsStart
+                        ? userLocationAvailable
+                          ? "Current location"
+                          : "Location unavailable"
+                        : (startBuilding?.name ?? "Choose starting building")}
                     </Text>
                   </View>
                   <Pressable
@@ -586,14 +696,16 @@ export default function FloatingMapSearchBar({
                     paddingLeft: 14,
                     paddingRight: 50,
                     borderLeftWidth: 3,
-                    borderLeftColor: activeField === "to" ? Colors.accent : "transparent",
+                    borderLeftColor:
+                      activeField === "to" ? Colors.accent : "transparent",
                     borderBottomLeftRadius: 18,
                   }}
                 >
                   <View style={{ flex: 1 }}>
                     <Text
                       style={{
-                        color: activeField === "to" ? Colors.accent : Colors.muted,
+                        color:
+                          activeField === "to" ? Colors.accent : Colors.muted,
                         fontFamily: Fonts.bodyMedium,
                         fontSize: 10,
                         letterSpacing: 1.2,
@@ -645,6 +757,57 @@ export default function FloatingMapSearchBar({
                   <Feather name="shuffle" size={12} color={Colors.muted} />
                 </Pressable>
               </View>
+
+              {activeField === "from" && (
+                <Pressable
+                  onPress={onUseCurrentLocationAsStart}
+                  disabled={!userLocationAvailable}
+                  style={{
+                    marginHorizontal: 12,
+                    marginBottom: 10,
+                    borderRadius: 14,
+                    paddingVertical: 10,
+                    paddingHorizontal: 12,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 8,
+                    backgroundColor:
+                      useCurrentLocationAsStart && userLocationAvailable
+                        ? Colors.accentBg
+                        : Colors.card,
+                    borderColor:
+                      useCurrentLocationAsStart && userLocationAvailable
+                        ? Colors.accent
+                        : Colors.border,
+                    borderWidth: 1,
+                    opacity: userLocationAvailable ? 1 : 0.6,
+                  }}
+                >
+                  <Feather
+                    name="navigation"
+                    size={14}
+                    color={
+                      useCurrentLocationAsStart && userLocationAvailable
+                        ? Colors.accent
+                        : Colors.muted
+                    }
+                  />
+                  <Text
+                    style={{
+                      color:
+                        useCurrentLocationAsStart && userLocationAvailable
+                          ? Colors.accent
+                          : Colors.muted,
+                      fontFamily: Fonts.bodySemiBold,
+                      fontSize: 13,
+                    }}
+                  >
+                    {userLocationAvailable
+                      ? "Use my current location"
+                      : "Location unavailable"}
+                  </Text>
+                </Pressable>
+              )}
 
               {/* Building list — extra padding to match the original inset */}
               <ScrollView
@@ -707,7 +870,11 @@ export default function FloatingMapSearchBar({
                         hitSlop={8}
                         style={{ paddingHorizontal: 8, paddingVertical: 10 }}
                       >
-                        <Feather name="map-pin" size={14} color={Colors.muted} />
+                        <Feather
+                          name="map-pin"
+                          size={14}
+                          color={Colors.muted}
+                        />
                       </Pressable>
                     </View>
                   ))
@@ -734,14 +901,17 @@ export default function FloatingMapSearchBar({
                       paddingHorizontal: 12,
                       alignItems: "center",
                       backgroundColor:
-                        routeChoice === "shortest" ? Colors.accent : Colors.card,
+                        routeChoice === "shortest"
+                          ? Colors.accent
+                          : Colors.card,
                       borderColor: Colors.border,
                       borderWidth: 1,
                     }}
                   >
                     <Text
                       style={{
-                        color: routeChoice === "shortest" ? Colors.bg : Colors.text,
+                        color:
+                          routeChoice === "shortest" ? Colors.bg : Colors.text,
                         fontFamily: Fonts.bodySemiBold,
                         fontSize: 12,
                       }}
@@ -759,14 +929,19 @@ export default function FloatingMapSearchBar({
                       paddingHorizontal: 12,
                       alignItems: "center",
                       backgroundColor:
-                        routeChoice === "leastCrowded" ? Colors.accent : Colors.card,
+                        routeChoice === "leastCrowded"
+                          ? Colors.accent
+                          : Colors.card,
                       borderColor: Colors.border,
                       borderWidth: 1,
                     }}
                   >
                     <Text
                       style={{
-                        color: routeChoice === "leastCrowded" ? Colors.bg : Colors.text,
+                        color:
+                          routeChoice === "leastCrowded"
+                            ? Colors.bg
+                            : Colors.text,
                         fontFamily: Fonts.bodySemiBold,
                         fontSize: 12,
                       }}
@@ -798,7 +973,13 @@ export default function FloatingMapSearchBar({
                     }}
                   >
                     <View>
-                      <View style={{ flexDirection: "row", alignItems: "baseline", gap: 6 }}>
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "baseline",
+                          gap: 6,
+                        }}
+                      >
                         <Text
                           style={{
                             color: Colors.text,
@@ -820,9 +1001,16 @@ export default function FloatingMapSearchBar({
                           </Text>
                         )}
                       </View>
-                      <Pressable onPress={onClearRoute} style={{ marginTop: 4 }}>
+                      <Pressable
+                        onPress={onClearRoute}
+                        style={{ marginTop: 4 }}
+                      >
                         <Text
-                          style={{ color: Colors.muted, fontFamily: Fonts.body, fontSize: 11 }}
+                          style={{
+                            color: Colors.muted,
+                            fontFamily: Fonts.body,
+                            fontSize: 11,
+                          }}
                         >
                           Clear route
                         </Text>
@@ -830,10 +1018,10 @@ export default function FloatingMapSearchBar({
                     </View>
                     <Pressable
                       onPress={onGo}
-                      disabled={!activeDistanceMeters}
+                      disabled={activeDistanceMeters == null}
                       style={{
                         borderRadius: 14,
-                        backgroundColor: activeDistanceMeters ? Colors.accent : Colors.border,
+                        backgroundColor: activeDistanceMeters != null ? Colors.accent : Colors.border,
                         paddingHorizontal: 22,
                         paddingVertical: 12,
                       }}

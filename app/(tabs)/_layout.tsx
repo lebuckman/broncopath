@@ -82,15 +82,6 @@ export default function TabsLayout() {
           },
         })}
       />
-      <Tabs.Screen
-        name="route"
-        options={{
-          title: "Routes",
-          tabBarIcon: ({ color }) => (
-            <Feather name="navigation" size={20} color={color} />
-          ),
-        }}
-      />
     </Tabs>
   );
 }
