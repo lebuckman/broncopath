@@ -82,6 +82,24 @@ export default function TabsLayout() {
           },
         })}
       />
+
+      <Tabs.Screen 
+        name="library" 
+        options={{ title: "Library",
+          tabBarIcon: ({ color }) => (
+            <Feather name="book-open" size={20} color={color} /> 
+          ),
+        }} 
+        listeners={({ navigation }) => ({
+          tabPress: () => {
+            const now = Date.now();
+            if (now - lastRoomsPress.current < 300) {
+              navigation.setParams({ collapseAll: now });
+            }
+            lastRoomsPress.current = now;
+          },
+        })}
+      />
       
     </Tabs>
   );

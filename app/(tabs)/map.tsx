@@ -58,7 +58,7 @@ function areSameRoute(a: RoutingGraphEdge[], b: RoutingGraphEdge[]) {
 
 export default function MapScreen() {
   const userLocation = useUserLocation(3);
-  const [useCurrentLocationAsStart, setUseCurrentLocationAsStart] =useState(true);
+  const [useCurrentLocationAsStart, setUseCurrentLocationAsStart] = useState(true);
   const [routeSeedLocation, setRouteSeedLocation] = useState<
     [number, number] | null
   >(null);
