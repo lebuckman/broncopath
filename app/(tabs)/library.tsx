@@ -154,22 +154,244 @@ function buildInjectJS(
   const end = addDateTime(date, startTime, duration);
   const config = {
     date,
+    eid: room.eid,
+    gid: room.gid,
+    lid: room.lid,
     roomName: room.name,
+    startIso: `${date}T${startTime}:00`,
+    startMinute: `${date}T${startTime}`,
+    startValueSpace: `${date} ${startTime}:00`,
     startLabel: toLibCalTimeLabel(startTime),
-    endLabel: toLibCalTimeLabel(end.time),
+    endIso: `${end.date}T${end.time}:00`,
+    endMinute: `${end.date}T${end.time}`,
     endValueSpace: `${end.date} ${end.time}:00`,
-    endValueIso: `${end.date}T${end.time}`,
-    pageIndex: room.pageIndex,
+    endLabel: toLibCalTimeLabel(end.time),
     duration,
   };
 
   return `
 (function() {
+  if (window.__broncoPathLibCalStarted) return true;
+  window.__broncoPathLibCalStarted = true;
+
   var config = ${JSON.stringify(config)};
+  var maxAttempts = 80;
   var attempts = 0;
+
+  function log(stage, details) {
+    try {
+      if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          type: 'broncoPathLibCal',
+          stage: stage,
+          details: details || null
+        }));
+      }
+    } catch (e) {}
+  }
 
   function normalize(value) {
     return String(value || '').toLowerCase().replace(/\s+/g, '').trim();
+  }
+
+  function normalizeSlotStart(value) {
+    var text = String(value || '').replace(' ', 'T');
+    var match = text.match(/(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/);
+    return match ? match[1] + 'T' + match[2] : '';
+  }
+
+  function addDays(dateText, days) {
+    var parts = dateText.split('-').map(Number);
+    var d = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2] + days));
+    return d.toISOString().slice(0, 10);
+  }
+
+  function phpDateTime(value) {
+    if (window.moment && window.springSpace && springSpace.phpDateTimeFormat) {
+      return moment(value).format(springSpace.phpDateTimeFormat);
+    }
+    return String(value || '').replace('T', ' ');
+  }
+
+  function viewStartDate() {
+    try {
+      var timeline = window.getCurrentTimelineInstance && getCurrentTimelineInstance(config.lid);
+      if (timeline && timeline.view && timeline.view.activeStart && window.moment) {
+        return moment(timeline.view.activeStart).format('YYYY-MM-DD');
+      }
+    } catch (e) {}
+    return config.date;
+  }
+
+  function viewEndDate() {
+    try {
+      var timeline = window.getCurrentTimelineInstance && getCurrentTimelineInstance(config.lid);
+      if (timeline && timeline.view && timeline.view.activeEnd && window.moment) {
+        return moment(timeline.view.activeEnd).format('YYYY-MM-DD');
+      }
+    } catch (e) {}
+    return addDays(config.date, 1);
+  }
+
+  function currentBookings() {
+    try {
+      if (window.preparePendingBookingsPayload) return preparePendingBookingsPayload();
+    } catch (e) {}
+    return [];
+  }
+
+  function postJson(url, payload) {
+    return new Promise(function(resolve, reject) {
+      if (window.jQuery && jQuery.ajax) {
+        jQuery.ajax({
+          type: 'post',
+          url: url,
+          data: payload,
+          dataType: 'json'
+        }).done(resolve).fail(function(xhr) {
+          reject(new Error((xhr && (xhr.responseText || xhr.statusText || xhr.status)) || 'LibCal AJAX request failed'));
+        });
+        return;
+      }
+
+      reject(new Error('jQuery is not available on LibCal page'));
+    });
+  }
+
+  function fetchSlotFromLibCal() {
+    var payload = {
+      lid: config.lid,
+      gid: config.gid,
+      eid: config.eid,
+      seat: 0,
+      seatId: 0,
+      zone: 0,
+      filters: '',
+      start: config.date,
+      end: addDays(config.date, 1),
+      bookings: currentBookings(),
+      pageIndex: 0,
+      pageSize: 1
+    };
+
+    return postJson('/spaces/availability/grid', payload).then(function(data) {
+      var slots = Array.isArray(data && data.slots) ? data.slots : [];
+      for (var i = 0; i < slots.length; i++) {
+        var slot = slots[i];
+        var itemId = Number(slot.itemId || slot.eid || slot.id);
+        if (itemId !== Number(config.eid)) continue;
+        if (normalizeSlotStart(slot.start) !== config.startMinute) continue;
+
+        var classText = normalize([slot.className, slot.classNames].flat ? [slot.className, slot.classNames].flat().join(' ') : String(slot.className || '') + ' ' + String(slot.classNames || ''));
+        var unavailable = classText.indexOf('checkout') !== -1 ||
+          classText.indexOf('unavailable') !== -1 ||
+          classText.indexOf('padding') !== -1 ||
+          classText.indexOf('booked') !== -1 ||
+          classText.indexOf('pending') !== -1 ||
+          slot.status === 1 ||
+          slot.status === '1';
+
+        if (!unavailable && slot.checksum) return slot;
+      }
+
+      throw new Error('Matching LibCal slot was not returned by /spaces/availability/grid');
+    });
+  }
+
+  function applyBookingAdd(slot) {
+    var payload = {
+      add: {
+        eid: config.eid,
+        seat_id: 0,
+        gid: config.gid,
+        lid: config.lid,
+        start: phpDateTime(config.startIso),
+        checksum: slot.checksum
+      },
+      lid: config.lid,
+      gid: 0,
+      start: config.date,
+      end: addDays(config.date, 1),
+      bookings: currentBookings()
+    };
+
+    return postJson('/spaces/availability/booking/add', payload).then(function(data) {
+      if (data && data.error) throw new Error(data.error);
+      try {
+        if (typeof pendingBookingsLimitIssues !== 'undefined') {
+          pendingBookingsLimitIssues = data.limitIssues || [];
+        }
+        if (window.updatePendingBookingsFromData && data && data.bookings) {
+          updatePendingBookingsFromData(data.bookings);
+        }
+        if (window.renderPendingRoomBookings) {
+          renderPendingRoomBookings();
+        }
+      } catch (e) {
+        throw new Error('LibCal accepted the slot, but BroncoPath could not render the pending booking: ' + e.message);
+      }
+      return data;
+    });
+  }
+
+  function waitForEndSelect() {
+    return new Promise(function(resolve, reject) {
+      var tries = 0;
+      var timer = setInterval(function() {
+        tries += 1;
+        var selects = Array.prototype.slice.call(document.querySelectorAll('select.b-end-date'));
+        if (selects.length > 0 || config.duration === 180) {
+          clearInterval(timer);
+          resolve(selects);
+          return;
+        }
+        if (tries > 40) {
+          clearInterval(timer);
+          reject(new Error('LibCal end-time dropdown did not appear'));
+        }
+      }, 250);
+    });
+  }
+
+  function selectEndTime(selects) {
+    if (!selects || selects.length === 0) return Promise.resolve();
+
+    var targetEnd = normalizeSlotStart(config.endIso);
+    for (var i = 0; i < selects.length; i++) {
+      var select = selects[i];
+      var options = Array.prototype.slice.call(select.options || []);
+      for (var j = 0; j < options.length; j++) {
+        var option = options[j];
+        var value = String(option.value || '');
+        var label = normalize(option.textContent || '');
+        if (
+          normalizeSlotStart(value) === targetEnd ||
+          value.indexOf(config.endValueSpace) !== -1 ||
+          label.indexOf(normalize(config.endLabel)) !== -1
+        ) {
+          select.value = option.value;
+          select.dispatchEvent(new Event('change', { bubbles: true }));
+          log('selected-end-time', { value: option.value });
+          return new Promise(function(resolve) { setTimeout(resolve, 1200); });
+        }
+      }
+    }
+
+    throw new Error('Requested end time was not available in LibCal dropdown');
+  }
+
+  function submitTimes() {
+    if (window.submitPendingTimes) {
+      log('submitting-times-via-libcal-function');
+      submitPendingTimes();
+      return;
+    }
+
+    var button = document.querySelector('#submit_times');
+    if (!button || button.disabled) throw new Error('Submit Times button is unavailable');
+    log('submitting-times-via-button');
+    button.scrollIntoView({ block: 'center' });
+    button.click();
   }
 
   function datePhrase() {
@@ -182,15 +404,7 @@ function buildInjectJS(
     });
   }
 
-  function applyPageIndex() {
-    try {
-      if (window.springyPage && typeof window.springyPage.pageIndex !== 'undefined') {
-        window.springyPage.pageIndex = config.pageIndex || 0;
-      }
-    } catch (e) {}
-  }
-
-  function findMatchingSlot() {
+  function findMatchingDomSlot() {
     var wantedRoom = normalize(config.roomName);
     var wantedTime = normalize(config.startLabel);
     var wantedDate = normalize(datePhrase());
@@ -209,79 +423,63 @@ function buildInjectJS(
     return null;
   }
 
-  function clickSlot() {
-    if (window.__broncoPathSlotClicked) return true;
-
-    var slot = findMatchingSlot();
-    if (!slot) return false;
-
-    window.__broncoPathSlotClicked = true;
-    slot.scrollIntoView({ block: 'center', inline: 'center' });
-    slot.click();
-    return true;
-  }
-
-  function selectEndTime() {
-    if (!window.__broncoPathSlotClicked) return false;
-    if (window.__broncoPathEndSelected) return true;
-
-    var selects = Array.prototype.slice.call(document.querySelectorAll('select.b-end-date'));
-    if (selects.length === 0) return config.duration === 180;
-
-    for (var i = 0; i < selects.length; i++) {
-      var select = selects[i];
-      var options = Array.prototype.slice.call(select.options || []);
-
-      for (var j = 0; j < options.length; j++) {
-        var option = options[j];
-        var value = String(option.value || '');
-        var label = normalize(option.textContent || '');
-        if (
-          value.indexOf(config.endValueSpace) !== -1 ||
-          value.indexOf(config.endValueIso) !== -1 ||
-          label.indexOf(normalize(config.endLabel)) !== -1
-        ) {
-          select.value = option.value;
-          select.dispatchEvent(new Event('change', { bubbles: true }));
-          window.__broncoPathEndSelected = true;
-          return true;
+  function domClickFallback() {
+    log('dom-click-fallback-started');
+    var timer = setInterval(function() {
+      attempts += 1;
+      var slot = findMatchingDomSlot();
+      if (!slot) {
+        if (attempts > maxAttempts) {
+          clearInterval(timer);
+          log('failed', { reason: 'Matching visible DOM slot not found' });
         }
+        return;
       }
-    }
 
-    return false;
+      clearInterval(timer);
+      slot.scrollIntoView({ block: 'center', inline: 'center' });
+      slot.click();
+      waitForEndSelect()
+        .then(selectEndTime)
+        .then(function() { setTimeout(submitTimes, 500); })
+        .catch(function(error) { log('failed', { reason: error.message || String(error) }); });
+    }, 250);
   }
 
-  function submitTimes() {
-    if (window.__broncoPathSubmitTimesClicked) return true;
-
-    var button = document.querySelector('#submit_times');
-    if (!button || button.disabled) return false;
-
-    window.__broncoPathSubmitTimesClicked = true;
-    button.scrollIntoView({ block: 'center' });
-    button.click();
-    return true;
-  }
-
-  var timer = setInterval(function() {
-    attempts += 1;
-    applyPageIndex();
-
-    if (!clickSlot()) {
-      if (attempts > 40) clearInterval(timer);
+  function start() {
+    if (location.hostname !== 'cpp.libcal.com' || location.pathname.indexOf('/reserve/') === -1) {
       return;
     }
 
-    if (selectEndTime()) {
-      setTimeout(submitTimes, 700);
-      if (window.__broncoPathSubmitTimesClicked || attempts > 40) {
-        clearInterval(timer);
+    if (!window.jQuery || !window.moment || !window.springyPage) {
+      attempts += 1;
+      if (attempts > maxAttempts) {
+        log('failed', { reason: 'LibCal scripts did not finish loading' });
+        return;
       }
+      setTimeout(start, 250);
+      return;
     }
 
-    if (attempts > 40) clearInterval(timer);
-  }, 500);
+    log('direct-libcal-flow-started', config);
+
+    fetchSlotFromLibCal()
+      .then(function(slot) {
+        log('found-slot-checksum');
+        return applyBookingAdd(slot);
+      })
+      .then(waitForEndSelect)
+      .then(selectEndTime)
+      .then(function() {
+        setTimeout(submitTimes, 500);
+      })
+      .catch(function(error) {
+        log('direct-flow-failed', { reason: error.message || String(error) });
+        domClickFallback();
+      });
+  }
+
+  start();
 })();
 true;
   `.trim();
@@ -775,7 +973,7 @@ function BookingStep({ url, injectJS, room, filters, ready, onReady }: BookingSt
           {room.name}
         </Text>
         <Text style={{ color: Colors.muted, fontFamily: Fonts.mono, fontSize: 11 }}>
-          {to12h(filters.startTime)}–{to12h(endTime)}
+          {filters.date} {to12h(filters.startTime)}–{to12h(endTime)}
         </Text>
       </View>
 
@@ -805,6 +1003,9 @@ function BookingStep({ url, injectJS, room, filters, ready, onReady }: BookingSt
         javaScriptEnabled
         domStorageEnabled
         style={{ flex: 1, backgroundColor: Colors.bg }}
+        onMessage={(event) => {
+          console.log("LibCal WebView:", event.nativeEvent.data);
+        }}
         onNavigationStateChange={(nav: WebViewNavigation) => {
           if (nav.url.includes("/booking/")) {
             // User can view LibCal confirmation in the WebView.

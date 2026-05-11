@@ -461,7 +461,7 @@ function buildResults(
         isAvailable,
         availableStarts: starts,
         nextAvailableStart: starts.find((start) => start >= `${query.date}T${query.startTime}`) ?? starts[0] ?? null,
-        bookingUrl: `${LIBCAL_BASE}${LIBCAL_PAGE_PATH}?lid=${LID}&gid=${DEFAULT_GROUP_ID}&dt=${query.date}`,
+        bookingUrl: `${LIBCAL_BASE}${LIBCAL_PAGE_PATH}?lid=${LID}&gid=${room.gid}&eid=${room.eid}&dt=${query.date}`,
       };
     })
     .sort((a, b) => {
