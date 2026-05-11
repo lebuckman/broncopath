@@ -127,3 +127,71 @@ export type CampusGraphResponse = {
   nodes: CampusGraphNode[];
   edges: CampusGraphEdge[];
 };
+export type LibraryAvailabilityQuery = {
+  date: string;
+  startTime: string;
+  duration: number;
+  groupSize: number;
+  floor: string;
+  needsPower: boolean;
+  needsADA: boolean;
+};
+
+export type LibraryRoomResult = {
+  id: number;
+  eid: number;
+  gid: number;
+  lid: number;
+  name: string;
+  title: string;
+  url: string;
+  grouping: string;
+  capacity: number;
+  floor: string | null;
+  hasPower: boolean;
+  isADA: boolean;
+  pageIndex: number;
+  isAvailable: boolean;
+  availableStarts: string[];
+  nextAvailableStart: string | null;
+  bookingUrl: string;
+};
+
+export async function getLibraryAvailability(
+  query: LibraryAvailabilityQuery,
+): Promise<LibraryRoomResult[]> {
+  const params = new URLSearchParams({
+    date: query.date,
+    startTime: query.startTime,
+    duration: String(query.duration),
+    groupSize: String(query.groupSize),
+    floor: query.floor,
+    needsPower: String(query.needsPower),
+    needsADA: String(query.needsADA),
+  });
+
+  const response = await fetch(`${BASE_URL}/api/library/availability?${params.toString()}`);
+
+  if (!response.ok) {
+    let message = `Failed to fetch library availability: ${response.status}`;
+
+    try {
+      const data = await response.json();
+      if (data && typeof data.error === "string") {
+        message = data.error;
+      }
+    } catch {
+      // keep the status-based message
+    }
+
+    throw new Error(message);
+  }
+
+  const data = await response.json();
+
+  if (!Array.isArray(data)) {
+    throw new Error("Invalid library availability response: expected array");
+  }
+
+  return data;
+}

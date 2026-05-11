@@ -1,19 +1,14 @@
 /**
  * app/(tabs)/library.tsx
  *
- * Three-step library room booking flow:
- *   Filter → Results (live from LibCal API) → Book (WebView + SSO)
- *
- * Requires: npx expo install react-native-webview  (then npx expo run:ios)
- * Add tab to app/(tabs)/_layout.tsx:
- *   <Tabs.Screen name="library" options={{ title: "Library",
- *     tabBarIcon: ({ color }) => <Feather name="book-open" size={20} color={color} /> }} />
+ * Native filter/results UI backed by BroncoPath's Express adapter.
+ * Final booking stays in LibCal WebView so CPP SSO is handled by CPP.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Animated,
   Linking,
   Pressable,
@@ -26,8 +21,10 @@ import { Feather } from "@expo/vector-icons";
 import { WebView, type WebViewNavigation } from "react-native-webview";
 import { Colors } from "../../constants/colors";
 import { Fonts } from "../../constants/fonts";
-
-// ─── Constants ────────────────────────────────────────────────────────────────
+import {
+  getLibraryAvailability,
+  type LibraryRoomResult,
+} from "../../lib/api";
 
 const LIBCAL_BASE = "https://cpp.libcal.com";
 const LID = 8262;
@@ -44,14 +41,14 @@ const TIME_SLOTS = [
 
 const DURATIONS = [
   { label: "30 min", value: 30 },
-  { label: "1 hr",   value: 60 },
+  { label: "1 hr", value: 60 },
   { label: "1.5 hr", value: 90 },
-  { label: "2 hr",   value: 120 },
-  { label: "3 hr",   value: 180 },
+  { label: "2 hr", value: 120 },
+  { label: "3 hr", value: 180 },
 ];
 
 const FLOORS = [
-  { label: "Any",     value: "any" },
+  { label: "Any", value: "any" },
   { label: "Floor 2", value: "2" },
   { label: "Floor 3", value: "3" },
   { label: "Floor 4", value: "4" },
@@ -59,43 +56,29 @@ const FLOORS = [
   { label: "Floor 6", value: "6" },
 ];
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface Filters {
+type Filters = {
   date: string;
-  startTime: string;   // "HH:MM" 24h
-  duration: number;    // minutes
-  groupSize: number;   // 2–9
+  startTime: string;
+  duration: number;
+  groupSize: number;
   floor: string;
   needsPower: boolean;
   needsADA: boolean;
-}
+};
 
-interface LibCalRoom {
-  id: number;
-  title: string;
-  description: string;
-  capacity: number;
-  floor: string | null;
-  hasPower: boolean;
-  isADA: boolean;
-}
-
-interface RoomWithSlots {
-  room: LibCalRoom;
+type RoomWithSlots = {
+  room: LibraryRoomResult;
   isAvailable: boolean;
-}
+};
 
 type Step = "filter" | "results" | "booking";
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function getDays() {
   return Array.from({ length: 7 }, (_, i) => {
     const d = new Date();
     d.setDate(d.getDate() + i);
     return {
-      value: d.toISOString().slice(0, 10),
+      value: formatDateValue(d),
       label:
         i === 0
           ? "Today"
@@ -108,163 +91,222 @@ function getDays() {
   });
 }
 
+function formatDateValue(date: Date): string {
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("-");
+}
+
 function to12h(time24: string): string {
-  const [hStr, mStr] = time24.split(":");
-  const h = parseInt(hStr!, 10);
+  const [hStr = "0", mStr = "00"] = time24.split(":");
+  const h = parseInt(hStr, 10);
   const period = h >= 12 ? "PM" : "AM";
   const hour = h % 12 || 12;
   return `${hour}:${mStr} ${period}`;
 }
 
+function toLibCalTimeLabel(time24: string): string {
+  return to12h(time24).replace(" ", "").toLowerCase();
+}
+
 function addMins(time24: string, minutes: number): string {
-  const [h, m] = time24.split(":").map(Number);
+  const [h = 0, m = 0] = time24.split(":").map(Number);
   const total = h * 60 + m + minutes;
   return `${String(Math.floor(total / 60) % 24).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
 }
 
-function extractFloor(title: string): string | null {
-  const m = title.match(/\b([2-6])\d{2}\b/);
-  return m?.[1] ?? null;
+function addDateTime(date: string, time24: string, minutes: number): { date: string; time: string } {
+  const [yearText, monthText, dayText] = date.split("-");
+  const [hourText, minuteText] = time24.split(":");
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+  const hour = Number(hourText);
+  const minute = Number(minuteText);
+  const total = hour * 60 + minute + minutes;
+  const dayOffset = Math.floor(total / 1440);
+  const minuteOfDay = ((total % 1440) + 1440) % 1440;
+  const adjusted = new Date(Date.UTC(year, month - 1, day + dayOffset));
+
+  return {
+    date: adjusted.toISOString().slice(0, 10),
+    time: `${String(Math.floor(minuteOfDay / 60)).padStart(2, "0")}:${String(minuteOfDay % 60).padStart(2, "0")}`,
+  };
 }
 
-// ─── API ──────────────────────────────────────────────────────────────────────
-
-async function fetchRoomList(): Promise<LibCalRoom[]> {
-  const res = await fetch(
-    `${LIBCAL_BASE}/api/1.1/space/categories/${LID}`,
-    { headers: { Accept: "application/json" } },
-  );
-  if (!res.ok) throw new Error(`categories ${res.status}`);
-  const data = await res.json();
-
-  const rooms: LibCalRoom[] = [];
-  for (const cat of data.categories ?? []) {
-    for (const item of (cat.items ?? cat.spaces ?? [])) {
-      const attrs: { name: string }[] = item.attributes ?? [];
-      rooms.push({
-        id: item.id,
-        title: item.name ?? item.title ?? "Study Room",
-        description: item.description ?? "",
-        capacity: item.capacity ?? 0,
-        floor: extractFloor(item.name ?? item.title ?? ""),
-        hasPower: attrs.some((a) => /power/i.test(a.name)),
-        isADA:    attrs.some((a) => /accessible|ada/i.test(a.name)),
-      });
-    }
-  }
-  return rooms;
+function slotKeyTo12h(slotKey: string | null): string | null {
+  const time = slotKey?.split("T")[1];
+  return time ? to12h(time) : null;
 }
 
-async function fetchAvailability(
-  ids: number[],
+function buildLibCalDirectUrl(date: string): string {
+  return `${LIBCAL_BASE}/reserve/study-rooms?lid=${LID}&gid=0&dt=${date}`;
+}
+
+function buildInjectJS(
   date: string,
-): Promise<Record<number, { from: string; to: string }[]>> {
-  if (ids.length === 0) return {};
-  const res = await fetch(
-    `${LIBCAL_BASE}/api/1.1/space/availability/${ids.join(",")}?availability=${date}`,
-    { headers: { Accept: "application/json" } },
-  );
-  if (!res.ok) throw new Error(`availability ${res.status}`);
-  const data: any[] = await res.json();
-  const result: Record<number, { from: string; to: string }[]> = {};
-  for (const item of data) {
-    result[item.id] = item.availability ?? [];
-  }
-  return result;
-}
+  startTime: string,
+  duration: number,
+  room: LibraryRoomResult,
+): string {
+  const end = addDateTime(date, startTime, duration);
+  const config = {
+    date,
+    roomName: room.name,
+    startLabel: toLibCalTimeLabel(startTime),
+    endLabel: toLibCalTimeLabel(end.time),
+    endValueSpace: `${end.date} ${end.time}:00`,
+    endValueIso: `${end.date}T${end.time}`,
+    pageIndex: room.pageIndex,
+    duration,
+  };
 
-function filterAndMatch(
-  rooms: LibCalRoom[],
-  availability: Record<number, { from: string; to: string }[]>,
-  filters: Filters,
-): RoomWithSlots[] {
-  const endTime  = addMins(filters.startTime, filters.duration);
-  const wantStart = new Date(`${filters.date}T${filters.startTime}:00`);
-  const wantEnd   = new Date(`${filters.date}T${endTime}:00`);
-  const slotsNeeded = filters.duration / 30;
-
-  return rooms
-    .filter((r) => {
-      if (filters.floor !== "any" && r.floor !== filters.floor) return false;
-      if (r.capacity > 0 && filters.groupSize > r.capacity) return false;
-      if (filters.needsPower && !r.hasPower) return false;
-      if (filters.needsADA && !r.isADA) return false;
-      return true;
-    })
-    .map((room) => {
-      const slots = availability[room.id] ?? [];
-      let matching = 0;
-      for (const slot of slots) {
-        const s = new Date(slot.from);
-        const e = new Date(slot.to);
-        if (s >= wantStart && e <= wantEnd) matching++;
-      }
-      return { room, isAvailable: matching >= slotsNeeded };
-    })
-    .sort((a, b) => {
-      if (a.isAvailable !== b.isAvailable) return a.isAvailable ? -1 : 1;
-      const fa = a.room.floor ?? "9";
-      const fb = b.room.floor ?? "9";
-      return fa.localeCompare(fb);
-    });
-}
-
-// JS injected into the WebView to auto-click the requested timeslot
-function buildInjectJS(date: string, startTime: string): string {
-  const isoPrefix = `${date}T${startTime}:00`;
   return `
 (function() {
-  function tryClick() {
-    var selectors = [
-      '[data-date^="${isoPrefix}"]',
-      '.s-lc-eq-avail[data-date^="${date}T${startTime.replace(":", "")}"]',
-    ];
-    for (var i = 0; i < selectors.length; i++) {
-      var el = document.querySelector(selectors[i]);
-      if (el && !el.classList.contains('s-lc-eq-checkout') &&
-          !el.classList.contains('s-lc-eq-pending')) {
-        el.click();
-        return true;
+  var config = ${JSON.stringify(config)};
+  var attempts = 0;
+
+  function normalize(value) {
+    return String(value || '').toLowerCase().replace(/\s+/g, '').trim();
+  }
+
+  function datePhrase() {
+    var d = new Date(config.date + 'T00:00:00');
+    return d.toLocaleDateString('en-US', {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric'
+    });
+  }
+
+  function applyPageIndex() {
+    try {
+      if (window.springyPage && typeof window.springyPage.pageIndex !== 'undefined') {
+        window.springyPage.pageIndex = config.pageIndex || 0;
+      }
+    } catch (e) {}
+  }
+
+  function findMatchingSlot() {
+    var wantedRoom = normalize(config.roomName);
+    var wantedTime = normalize(config.startLabel);
+    var wantedDate = normalize(datePhrase());
+    var candidates = Array.prototype.slice.call(
+      document.querySelectorAll('a.s-lc-eq-avail[title], a.s-lc-eq-avail[aria-label]')
+    );
+
+    for (var i = 0; i < candidates.length; i++) {
+      var el = candidates[i];
+      var text = normalize(el.getAttribute('title') || el.getAttribute('aria-label') || el.textContent || '');
+      if (text.indexOf(wantedRoom) !== -1 && text.indexOf(wantedTime) !== -1 && text.indexOf(wantedDate) !== -1) {
+        return el;
       }
     }
+
+    return null;
+  }
+
+  function clickSlot() {
+    if (window.__broncoPathSlotClicked) return true;
+
+    var slot = findMatchingSlot();
+    if (!slot) return false;
+
+    window.__broncoPathSlotClicked = true;
+    slot.scrollIntoView({ block: 'center', inline: 'center' });
+    slot.click();
+    return true;
+  }
+
+  function selectEndTime() {
+    if (!window.__broncoPathSlotClicked) return false;
+    if (window.__broncoPathEndSelected) return true;
+
+    var selects = Array.prototype.slice.call(document.querySelectorAll('select.b-end-date'));
+    if (selects.length === 0) return config.duration === 180;
+
+    for (var i = 0; i < selects.length; i++) {
+      var select = selects[i];
+      var options = Array.prototype.slice.call(select.options || []);
+
+      for (var j = 0; j < options.length; j++) {
+        var option = options[j];
+        var value = String(option.value || '');
+        var label = normalize(option.textContent || '');
+        if (
+          value.indexOf(config.endValueSpace) !== -1 ||
+          value.indexOf(config.endValueIso) !== -1 ||
+          label.indexOf(normalize(config.endLabel)) !== -1
+        ) {
+          select.value = option.value;
+          select.dispatchEvent(new Event('change', { bubbles: true }));
+          window.__broncoPathEndSelected = true;
+          return true;
+        }
+      }
+    }
+
     return false;
   }
-  if (!tryClick()) {
-    setTimeout(tryClick, 1200);
-    setTimeout(tryClick, 2800);
+
+  function submitTimes() {
+    if (window.__broncoPathSubmitTimesClicked) return true;
+
+    var button = document.querySelector('#submit_times');
+    if (!button || button.disabled) return false;
+
+    window.__broncoPathSubmitTimesClicked = true;
+    button.scrollIntoView({ block: 'center' });
+    button.click();
+    return true;
   }
+
+  var timer = setInterval(function() {
+    attempts += 1;
+    applyPageIndex();
+
+    if (!clickSlot()) {
+      if (attempts > 40) clearInterval(timer);
+      return;
+    }
+
+    if (selectEndTime()) {
+      setTimeout(submitTimes, 700);
+      if (window.__broncoPathSubmitTimesClicked || attempts > 40) {
+        clearInterval(timer);
+      }
+    }
+
+    if (attempts > 40) clearInterval(timer);
+  }, 500);
 })();
 true;
   `.trim();
 }
 
-// ─── Screen ───────────────────────────────────────────────────────────────────
-
 export default function LibraryScreen() {
   const days = useMemo(() => getDays(), []);
 
   const [step, setStep] = useState<Step>("filter");
-
   const [filters, setFilters] = useState<Filters>({
-    date:        days[0]!.value,
-    startTime:   "10:00",
-    duration:    60,
-    groupSize:   2,
-    floor:       "any",
-    needsPower:  false,
-    needsADA:    false,
+    date: days[0]?.value ?? formatDateValue(new Date()),
+    startTime: "10:00",
+    duration: 60,
+    groupSize: 2,
+    floor: "any",
+    needsPower: false,
+    needsADA: false,
   });
 
-  // Results state
-  const [loading, setLoading]     = useState(false);
-  const [apiError, setApiError]   = useState<string | null>(null);
-  const [results, setResults]     = useState<RoomWithSlots[]>([]);
-
-  // Booking state
-  const [bookingRoom, setBookingRoom] = useState<LibCalRoom | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
+  const [results, setResults] = useState<RoomWithSlots[]>([]);
+  const [bookingRoom, setBookingRoom] = useState<LibraryRoomResult | null>(null);
   const [webViewReady, setWebViewReady] = useState(false);
 
-  // Slide animation between steps
   const slideAnim = useRef(new Animated.Value(0)).current;
 
   const animateTo = useCallback((direction: 1 | -1) => {
@@ -277,32 +319,25 @@ export default function LibraryScreen() {
     }).start();
   }, [slideAnim]);
 
-  // ── Search ────────────────────────────────────────────────────────────────
-
   async function handleSearch() {
+    setStep("results");
     setLoading(true);
     setApiError(null);
     setResults([]);
     animateTo(1);
-    setStep("results");
 
     try {
-      const rooms = await fetchRoomList();
-      const ids = rooms.map((r) => r.id);
-      const avail = await fetchAvailability(ids, filters.date);
-      const matched = filterAndMatch(rooms, avail, filters);
-      setResults(matched);
-    } catch (e: any) {
-      setApiError(e?.message ?? "Unknown error");
-      setResults([]);
+      const rooms = await getLibraryAvailability(filters);
+      setResults(rooms.map((room) => ({ room, isAvailable: room.isAvailable })));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown LibCal error";
+      setApiError(message);
     } finally {
       setLoading(false);
     }
   }
 
-  // ── Book ──────────────────────────────────────────────────────────────────
-
-  function openBooking(room: LibCalRoom) {
+  function openBooking(room: LibraryRoomResult) {
     setBookingRoom(room);
     setWebViewReady(false);
     animateTo(1);
@@ -314,23 +349,19 @@ export default function LibraryScreen() {
     if (step === "booking") {
       setStep("results");
       setBookingRoom(null);
+      setWebViewReady(false);
     } else {
       setStep("filter");
     }
   }
 
-  const bookingUrl = bookingRoom
-    ? `${LIBCAL_BASE}/reserve/spaces/study-rooms?lid=${LID}&eid=${bookingRoom.id}&dt=${filters.date}`
-    : "";
-
-  // ── Render ────────────────────────────────────────────────────────────────
+  const bookingUrl = bookingRoom?.bookingUrl ?? "";
 
   return (
     <SafeAreaView
       edges={["top"]}
       style={{ flex: 1, backgroundColor: Colors.bg }}
     >
-      {/* Back header when not on filter step */}
       {step !== "filter" && (
         <View
           style={{
@@ -349,19 +380,17 @@ export default function LibraryScreen() {
           <Text style={{ color: Colors.text, fontFamily: Fonts.display, fontSize: 20, flex: 1 }}>
             {step === "results"
               ? "Available Rooms"
-              : bookingRoom?.title ?? "Reserve Room"}
+              : bookingRoom?.name ?? "Reserve Room"}
           </Text>
           {step === "results" && (
             <Text style={{ color: Colors.muted, fontFamily: Fonts.mono, fontSize: 11 }}>
-              {results.filter((r) => r.isAvailable).length} available
+              {results.filter((r) => r.isAvailable).length} open
             </Text>
           )}
         </View>
       )}
 
-      <Animated.View
-        style={{ flex: 1, transform: [{ translateY: slideAnim }] }}
-      >
+      <Animated.View style={{ flex: 1, transform: [{ translateY: slideAnim }] }}>
         {step === "filter" && (
           <FilterStep
             days={days}
@@ -378,18 +407,14 @@ export default function LibraryScreen() {
             results={results}
             filters={filters}
             onBook={openBooking}
-            onOpenDirect={() =>
-              Linking.openURL(
-                `${LIBCAL_BASE}/reserve/spaces/study-rooms?lid=${LID}&dt=${filters.date}`,
-              )
-            }
+            onOpenDirect={() => Linking.openURL(buildLibCalDirectUrl(filters.date))}
           />
         )}
 
         {step === "booking" && bookingRoom && (
           <BookingStep
             url={bookingUrl}
-            injectJS={buildInjectJS(filters.date, filters.startTime)}
+            injectJS={buildInjectJS(filters.date, filters.startTime, filters.duration, bookingRoom)}
             room={bookingRoom}
             filters={filters}
             ready={webViewReady}
@@ -401,14 +426,12 @@ export default function LibraryScreen() {
   );
 }
 
-// ─── Filter Step ──────────────────────────────────────────────────────────────
-
-interface FilterStepProps {
+type FilterStepProps = {
   days: { value: string; label: string }[];
   filters: Filters;
   onChange: (patch: Partial<Filters>) => void;
   onSearch: () => void;
-}
+};
 
 function FilterStep({ days, filters, onChange, onSearch }: FilterStepProps) {
   const endTime = addMins(filters.startTime, filters.duration);
@@ -419,15 +442,13 @@ function FilterStep({ days, filters, onChange, onSearch }: FilterStepProps) {
       contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 44 }}
       showsVerticalScrollIndicator={false}
     >
-      {/* Header */}
       <Text style={{ color: Colors.text, fontFamily: Fonts.display, fontSize: 28, marginBottom: 4 }}>
         Library Rooms
       </Text>
-      <Text style={{ color: Colors.muted, fontFamily: Fonts.body, fontSize: 12, marginBottom: 24 }}>
-        Filter your specs — we'll find what's open.
+      <Text style={{ color: Colors.muted, fontFamily: Fonts.body, fontSize: 12, marginBottom: 24, lineHeight: 18 }}>
+        Pick a date, time, capacity, and room specs. BroncoPath checks availability; CPP handles SSO.
       </Text>
 
-      {/* Date */}
       <FilterLabel icon="calendar">Date</FilterLabel>
       <HScroll>
         {days.map((d) => (
@@ -440,7 +461,6 @@ function FilterStep({ days, filters, onChange, onSearch }: FilterStepProps) {
         ))}
       </HScroll>
 
-      {/* Start time */}
       <FilterLabel icon="clock">Start time</FilterLabel>
       <HScroll>
         {TIME_SLOTS.map((t) => (
@@ -453,7 +473,6 @@ function FilterStep({ days, filters, onChange, onSearch }: FilterStepProps) {
         ))}
       </HScroll>
 
-      {/* Duration */}
       <FilterLabel icon="watch">Duration</FilterLabel>
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 4 }}>
         {DURATIONS.map((d) => (
@@ -466,20 +485,27 @@ function FilterStep({ days, filters, onChange, onSearch }: FilterStepProps) {
         ))}
       </View>
 
-      {/* Time window summary */}
       <Text style={{
-        color: Colors.muted, fontFamily: Fonts.body, fontSize: 11,
-        marginTop: 6, marginBottom: 20,
+        color: Colors.muted,
+        fontFamily: Fonts.body,
+        fontSize: 11,
+        marginTop: 6,
+        marginBottom: 20,
       }}>
         {to12h(filters.startTime)} – {to12h(endTime)}
       </Text>
 
-      {/* Group size stepper */}
       <FilterLabel icon="users">Group size</FilterLabel>
       <View style={{
-        flexDirection: "row", alignItems: "center",
-        backgroundColor: Colors.card, borderColor: Colors.border, borderWidth: 1,
-        borderRadius: 16, alignSelf: "flex-start", marginBottom: 20, overflow: "hidden",
+        flexDirection: "row",
+        alignItems: "center",
+        backgroundColor: Colors.card,
+        borderColor: Colors.border,
+        borderWidth: 1,
+        borderRadius: 16,
+        alignSelf: "flex-start",
+        marginBottom: 20,
+        overflow: "hidden",
       }}>
         <StepperBtn
           icon="minus"
@@ -501,7 +527,6 @@ function FilterStep({ days, filters, onChange, onSearch }: FilterStepProps) {
         CPP group rooms require 2 – 9 students
       </Text>
 
-      {/* Floor preference */}
       <FilterLabel icon="layers">Preferred floor</FilterLabel>
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
         {FLOORS.map((f) => (
@@ -514,7 +539,6 @@ function FilterStep({ days, filters, onChange, onSearch }: FilterStepProps) {
         ))}
       </View>
 
-      {/* Preferences toggles */}
       <FilterLabel icon="sliders">Preferences</FilterLabel>
       <Toggle
         label="Power outlet"
@@ -529,7 +553,6 @@ function FilterStep({ days, filters, onChange, onSearch }: FilterStepProps) {
         onPress={() => onChange({ needsADA: !filters.needsADA })}
       />
 
-      {/* Search button */}
       <Pressable
         onPress={onSearch}
         onPressIn={() => setSearchPressed(true)}
@@ -554,16 +577,14 @@ function FilterStep({ days, filters, onChange, onSearch }: FilterStepProps) {
   );
 }
 
-// ─── Results Step ─────────────────────────────────────────────────────────────
-
-interface ResultsStepProps {
+type ResultsStepProps = {
   loading: boolean;
   error: string | null;
   results: RoomWithSlots[];
   filters: Filters;
-  onBook: (room: LibCalRoom) => void;
+  onBook: (room: LibraryRoomResult) => void;
   onOpenDirect: () => void;
-}
+};
 
 function ResultsStep({
   loading,
@@ -582,7 +603,7 @@ function ResultsStep({
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
         <ActivityIndicator size="large" color={Colors.accent} />
         <Text style={{ color: Colors.muted, fontFamily: Fonts.body, fontSize: 13, marginTop: 14 }}>
-          Checking LibCal availability…
+          Checking LibCal through BroncoPath…
         </Text>
       </View>
     );
@@ -593,47 +614,42 @@ function ResultsStep({
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32 }}>
         <Feather name="wifi-off" size={36} color={Colors.muted} style={{ marginBottom: 14 }} />
         <Text style={{
-          color: Colors.text, fontFamily: Fonts.bodyMedium, fontSize: 16,
-          textAlign: "center", marginBottom: 8,
+          color: Colors.text,
+          fontFamily: Fonts.bodyMedium,
+          fontSize: 16,
+          textAlign: "center",
+          marginBottom: 8,
         }}>
-          Couldn't reach LibCal
+          Couldn't read LibCal availability
         </Text>
         <Text style={{
-          color: Colors.muted, fontFamily: Fonts.body, fontSize: 12,
-          textAlign: "center", marginBottom: 28, lineHeight: 18,
+          color: Colors.muted,
+          fontFamily: Fonts.body,
+          fontSize: 12,
+          textAlign: "center",
+          marginBottom: 28,
+          lineHeight: 18,
         }}>
-          CPP's LibCal API may require authentication. Open LibCal directly to see availability.
+          The backend could not reach or parse LibCal. Open LibCal directly to continue with CPP's booking page.
         </Text>
-        <Pressable
+        <ActionButton
+          icon="external-link"
+          label="Open LibCal Directly"
           onPress={onOpenDirect}
-          style={{
-            backgroundColor: Colors.accentBg,
-            borderColor: Colors.accentBorder,
-            borderWidth: 1,
-            borderRadius: 14,
-            paddingHorizontal: 24,
-            paddingVertical: 14,
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 8,
-          }}
-        >
-          <Feather name="external-link" size={15} color={Colors.accent} />
-          <Text style={{ color: Colors.accent, fontFamily: Fonts.bodySemiBold, fontSize: 13 }}>
-            Open LibCal Directly
-          </Text>
-        </Pressable>
+        />
+        <Text style={{ color: Colors.muted, fontFamily: Fonts.mono, fontSize: 10, marginTop: 18, textAlign: "center" }}>
+          {error}
+        </Text>
       </View>
     );
   }
 
-  // Filter summary pill
   const summaryParts = [
-    to12h(filters.startTime) + " – " + to12h(endTime),
-    filters.groupSize + " people",
+    `${to12h(filters.startTime)} – ${to12h(endTime)}`,
+    `${filters.groupSize} people`,
     filters.floor !== "any" ? `Floor ${filters.floor}` : null,
     filters.needsPower ? "Power" : null,
-    filters.needsADA   ? "ADA"   : null,
+    filters.needsADA ? "ADA" : null,
   ].filter(Boolean).join(" · ");
 
   return (
@@ -641,11 +657,16 @@ function ResultsStep({
       contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 44 }}
       showsVerticalScrollIndicator={false}
     >
-      {/* Filter summary */}
       <View style={{
-        backgroundColor: Colors.card, borderColor: Colors.border, borderWidth: 1,
-        borderRadius: 14, padding: 14, marginBottom: 20,
-        flexDirection: "row", alignItems: "center", gap: 10,
+        backgroundColor: Colors.card,
+        borderColor: Colors.border,
+        borderWidth: 1,
+        borderRadius: 14,
+        padding: 14,
+        marginBottom: 20,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 10,
       }}>
         <Feather name="filter" size={13} color={Colors.muted} />
         <Text style={{ color: Colors.muted, fontFamily: Fonts.body, fontSize: 11, flex: 1 }}>
@@ -654,30 +675,15 @@ function ResultsStep({
       </View>
 
       {available.length === 0 && unavailable.length === 0 && (
-        <View style={{ alignItems: "center", paddingTop: 32 }}>
-          <Feather name="inbox" size={34} color={Colors.muted} style={{ marginBottom: 12 }} />
-          <Text style={{ color: Colors.text, fontFamily: Fonts.bodyMedium, fontSize: 15, marginBottom: 4 }}>
-            No rooms matched
-          </Text>
-          <Text style={{ color: Colors.muted, fontFamily: Fonts.body, fontSize: 12, textAlign: "center" }}>
-            Try adjusting your floor, group size, or preferences.
-          </Text>
-          <Pressable onPress={onOpenDirect} style={{ marginTop: 20, flexDirection: "row", alignItems: "center", gap: 6 }}>
-            <Feather name="external-link" size={13} color={Colors.accent} />
-            <Text style={{ color: Colors.accent, fontFamily: Fonts.bodySemiBold, fontSize: 12 }}>
-              Open LibCal directly
-            </Text>
-          </Pressable>
-        </View>
+        <EmptyResults onOpenDirect={onOpenDirect} />
       )}
 
-      {/* Available rooms */}
       {available.length > 0 && (
         <>
           <SectionLabel>Available ({available.length})</SectionLabel>
           {available.map(({ room }) => (
             <RoomCard
-              key={room.id}
+              key={room.eid}
               room={room}
               available
               onBook={() => onBook(room)}
@@ -686,15 +692,14 @@ function ResultsStep({
         </>
       )}
 
-      {/* Unavailable rooms — still show with dimmed Book button */}
       {unavailable.length > 0 && (
         <>
           <SectionLabel style={{ marginTop: available.length > 0 ? 24 : 0 }}>
-            Unavailable at this time ({unavailable.length})
+            Matching specs, unavailable now ({unavailable.length})
           </SectionLabel>
           {unavailable.map(({ room }) => (
             <RoomCard
-              key={room.id}
+              key={room.eid}
               room={room}
               available={false}
               onBook={() => onBook(room)}
@@ -703,7 +708,6 @@ function ResultsStep({
         </>
       )}
 
-      {/* Direct link footer */}
       <Pressable
         onPress={onOpenDirect}
         style={{ marginTop: 24, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 6 }}
@@ -717,23 +721,40 @@ function ResultsStep({
   );
 }
 
-// ─── Booking Step (WebView) ───────────────────────────────────────────────────
+function EmptyResults({ onOpenDirect }: { onOpenDirect: () => void }) {
+  return (
+    <View style={{ alignItems: "center", paddingTop: 32 }}>
+      <Feather name="inbox" size={34} color={Colors.muted} style={{ marginBottom: 12 }} />
+      <Text style={{ color: Colors.text, fontFamily: Fonts.bodyMedium, fontSize: 15, marginBottom: 4 }}>
+        No rooms matched
+      </Text>
+      <Text style={{ color: Colors.muted, fontFamily: Fonts.body, fontSize: 12, textAlign: "center", lineHeight: 18 }}>
+        Try another floor, group size, time, or preference combination.
+      </Text>
+      <Pressable onPress={onOpenDirect} style={{ marginTop: 20, flexDirection: "row", alignItems: "center", gap: 6 }}>
+        <Feather name="external-link" size={13} color={Colors.accent} />
+        <Text style={{ color: Colors.accent, fontFamily: Fonts.bodySemiBold, fontSize: 12 }}>
+          Open LibCal directly
+        </Text>
+      </Pressable>
+    </View>
+  );
+}
 
-interface BookingStepProps {
+type BookingStepProps = {
   url: string;
   injectJS: string;
-  room: LibCalRoom;
+  room: LibraryRoomResult;
   filters: Filters;
   ready: boolean;
   onReady: () => void;
-}
+};
 
 function BookingStep({ url, injectJS, room, filters, ready, onReady }: BookingStepProps) {
   const endTime = addMins(filters.startTime, filters.duration);
 
   return (
     <View style={{ flex: 1 }}>
-      {/* Booking context strip */}
       <View style={{
         backgroundColor: Colors.surface,
         borderBottomColor: Colors.border,
@@ -745,22 +766,29 @@ function BookingStep({ url, injectJS, room, filters, ready, onReady }: BookingSt
         gap: 10,
       }}>
         <View style={{
-          width: 8, height: 8, borderRadius: 4,
-          backgroundColor: Colors.accent,
+          width: 8,
+          height: 8,
+          borderRadius: 4,
+          backgroundColor: room.isAvailable ? Colors.accent : Colors.med,
         }} />
         <Text style={{ color: Colors.text, fontFamily: Fonts.bodyMedium, fontSize: 13, flex: 1 }} numberOfLines={1}>
-          {room.title}
+          {room.name}
         </Text>
         <Text style={{ color: Colors.muted, fontFamily: Fonts.mono, fontSize: 11 }}>
           {to12h(filters.startTime)}–{to12h(endTime)}
         </Text>
       </View>
 
-      {/* Loading overlay */}
       {!ready && (
         <View style={{
-          position: "absolute", top: 64, left: 0, right: 0, bottom: 0,
-          backgroundColor: Colors.bg, alignItems: "center", justifyContent: "center",
+          position: "absolute",
+          top: 64,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: Colors.bg,
+          alignItems: "center",
+          justifyContent: "center",
           zIndex: 10,
         }}>
           <ActivityIndicator size="large" color={Colors.accent} />
@@ -773,17 +801,17 @@ function BookingStep({ url, injectJS, room, filters, ready, onReady }: BookingSt
       <WebView
         source={{ uri: url }}
         injectedJavaScript={injectJS}
-        onLoad={onReady}
+        onLoadEnd={onReady}
+        javaScriptEnabled
+        domStorageEnabled
         style={{ flex: 1, backgroundColor: Colors.bg }}
         onNavigationStateChange={(nav: WebViewNavigation) => {
-          // LibCal sends the user to a confirmation page after booking
           if (nav.url.includes("/booking/")) {
-            // Booking confirmed — user can see confirmation in WebView
+            // User can view LibCal confirmation in the WebView.
           }
         }}
       />
 
-      {/* SSO note */}
       <View style={{
         backgroundColor: Colors.surface,
         borderTopColor: Colors.border,
@@ -795,15 +823,13 @@ function BookingStep({ url, injectJS, room, filters, ready, onReady }: BookingSt
         gap: 8,
       }}>
         <Feather name="lock" size={12} color={Colors.muted} />
-        <Text style={{ color: Colors.muted, fontFamily: Fonts.body, fontSize: 11 }}>
-          Sign in with your CPP account, then press Submit to reserve.
+        <Text style={{ color: Colors.muted, fontFamily: Fonts.body, fontSize: 11, flex: 1, lineHeight: 16 }}>
+          BroncoPath will try to select the slot and open CPP SSO. After login, confirm the final LibCal form.
         </Text>
       </View>
     </View>
   );
 }
-
-// ─── Shared primitives ────────────────────────────────────────────────────────
 
 function FilterLabel({
   icon,
@@ -816,8 +842,11 @@ function FilterLabel({
     <View style={{ flexDirection: "row", alignItems: "center", gap: 7, marginBottom: 10, marginTop: 4 }}>
       <Feather name={icon} size={13} color={Colors.accent} />
       <Text style={{
-        color: Colors.muted, fontFamily: Fonts.bodySemiBold,
-        fontSize: 11, letterSpacing: 0.9, textTransform: "uppercase",
+        color: Colors.muted,
+        fontFamily: Fonts.bodySemiBold,
+        fontSize: 11,
+        letterSpacing: 0.9,
+        textTransform: "uppercase",
       }}>
         {children}
       </Text>
@@ -825,7 +854,7 @@ function FilterLabel({
   );
 }
 
-function HScroll({ children }: { children: React.ReactNode }) {
+function HScroll({ children }: { children: ReactNode }) {
   return (
     <ScrollView
       horizontal
@@ -951,13 +980,17 @@ function Toggle({
         {label}
       </Text>
       <View style={{
-        width: 28, height: 17, borderRadius: 9,
+        width: 28,
+        height: 17,
+        borderRadius: 9,
         backgroundColor: value ? Colors.accent : Colors.border,
         justifyContent: "center",
         paddingHorizontal: 2,
       }}>
         <View style={{
-          width: 13, height: 13, borderRadius: 7,
+          width: 13,
+          height: 13,
+          borderRadius: 7,
           backgroundColor: Colors.bg,
           alignSelf: value ? "flex-end" : "flex-start",
         }} />
@@ -966,11 +999,14 @@ function Toggle({
   );
 }
 
-function SectionLabel({ children, style }: { children: string; style?: object }) {
+function SectionLabel({ children, style }: { children: ReactNode; style?: object }) {
   return (
     <Text style={[{
-      color: Colors.muted, fontFamily: Fonts.bodySemiBold,
-      fontSize: 11, letterSpacing: 0.9, textTransform: "uppercase",
+      color: Colors.muted,
+      fontFamily: Fonts.bodySemiBold,
+      fontSize: 11,
+      letterSpacing: 0.9,
+      textTransform: "uppercase",
       marginBottom: 10,
     }, style]}>
       {children}
@@ -983,11 +1019,12 @@ function RoomCard({
   available,
   onBook,
 }: {
-  room: LibCalRoom;
+  room: LibraryRoomResult;
   available: boolean;
   onBook: () => void;
 }) {
   const [pressed, setPressed] = useState(false);
+  const nextAvailable = slotKeyTo12h(room.nextAvailableStart);
 
   return (
     <View style={{
@@ -998,20 +1035,21 @@ function RoomCard({
       marginBottom: 10,
       overflow: "hidden",
     }}>
-      {/* Status strip */}
       <View style={{
         height: 3,
         backgroundColor: available ? Colors.accent : Colors.border,
       }} />
 
       <View style={{ padding: 16 }}>
-        {/* Title row */}
         <View style={{ flexDirection: "row", alignItems: "flex-start", marginBottom: 8 }}>
           <View style={{ flex: 1 }}>
             <Text style={{ color: Colors.text, fontFamily: Fonts.bodySemiBold, fontSize: 15, marginBottom: 3 }}>
-              {room.title}
+              {room.name}
             </Text>
-            <View style={{ flexDirection: "row", gap: 12, alignItems: "center" }}>
+            <Text style={{ color: Colors.muted, fontFamily: Fonts.body, fontSize: 11, marginBottom: 8 }} numberOfLines={1}>
+              {room.grouping}
+            </Text>
+            <View style={{ flexDirection: "row", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
               {room.floor && (
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
                   <Feather name="layers" size={11} color={Colors.muted} />
@@ -1028,12 +1066,20 @@ function RoomCard({
                   </Text>
                 </View>
               )}
+              {!available && nextAvailable && (
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                  <Feather name="clock" size={11} color={Colors.med} />
+                  <Text style={{ color: Colors.med, fontFamily: Fonts.body, fontSize: 11 }}>
+                    Next {nextAvailable}
+                  </Text>
+                </View>
+              )}
             </View>
           </View>
 
-          {/* Availability badge */}
           <View style={{
-            paddingHorizontal: 10, paddingVertical: 5,
+            paddingHorizontal: 10,
+            paddingVertical: 5,
             borderRadius: 99,
             backgroundColor: available ? Colors.accentBg : Colors.surface,
             borderColor: available ? Colors.accentBorder : Colors.border,
@@ -1051,35 +1097,13 @@ function RoomCard({
           </View>
         </View>
 
-        {/* Attribute icons */}
         {(room.hasPower || room.isADA) && (
           <View style={{ flexDirection: "row", gap: 8, marginBottom: 14 }}>
-            {room.hasPower && (
-              <View style={{
-                flexDirection: "row", alignItems: "center", gap: 5,
-                backgroundColor: Colors.surface, borderRadius: 8,
-                paddingHorizontal: 9, paddingVertical: 5,
-                borderColor: Colors.border, borderWidth: 1,
-              }}>
-                <Feather name="zap" size={11} color={Colors.med} />
-                <Text style={{ color: Colors.muted, fontFamily: Fonts.body, fontSize: 11 }}>Power</Text>
-              </View>
-            )}
-            {room.isADA && (
-              <View style={{
-                flexDirection: "row", alignItems: "center", gap: 5,
-                backgroundColor: Colors.surface, borderRadius: 8,
-                paddingHorizontal: 9, paddingVertical: 5,
-                borderColor: Colors.border, borderWidth: 1,
-              }}>
-                <Feather name="check-circle" size={11} color={Colors.low} />
-                <Text style={{ color: Colors.muted, fontFamily: Fonts.body, fontSize: 11 }}>ADA</Text>
-              </View>
-            )}
+            {room.hasPower && <AttributeBadge icon="zap" label="Power" color={Colors.med} />}
+            {room.isADA && <AttributeBadge icon="check-circle" label="ADA" color={Colors.low} />}
           </View>
         )}
 
-        {/* Book button */}
         <Pressable
           onPress={onBook}
           onPressIn={() => setPressed(true)}
@@ -1113,5 +1137,68 @@ function RoomCard({
         </Pressable>
       </View>
     </View>
+  );
+}
+
+function AttributeBadge({
+  icon,
+  label,
+  color,
+}: {
+  icon: keyof typeof Feather.glyphMap;
+  label: string;
+  color: string;
+}) {
+  return (
+    <View style={{
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 5,
+      backgroundColor: Colors.surface,
+      borderRadius: 8,
+      paddingHorizontal: 9,
+      paddingVertical: 5,
+      borderColor: Colors.border,
+      borderWidth: 1,
+    }}>
+      <Feather name={icon} size={11} color={color} />
+      <Text style={{ color: Colors.muted, fontFamily: Fonts.body, fontSize: 11 }}>{label}</Text>
+    </View>
+  );
+}
+
+function ActionButton({
+  icon,
+  label,
+  onPress,
+}: {
+  icon: keyof typeof Feather.glyphMap;
+  label: string;
+  onPress: () => void;
+}) {
+  const [pressed, setPressed] = useState(false);
+
+  return (
+    <Pressable
+      onPress={onPress}
+      onPressIn={() => setPressed(true)}
+      onPressOut={() => setPressed(false)}
+      style={{
+        backgroundColor: pressed ? Colors.cardHover : Colors.accentBg,
+        borderColor: Colors.accentBorder,
+        borderWidth: 1,
+        borderRadius: 14,
+        paddingHorizontal: 24,
+        paddingVertical: 14,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+      }}
+    >
+      <Feather name={icon} size={15} color={Colors.accent} />
+      <Text style={{ color: Colors.accent, fontFamily: Fonts.bodySemiBold, fontSize: 13 }}>
+        {label}
+      </Text>
+    </Pressable>
   );
 }
