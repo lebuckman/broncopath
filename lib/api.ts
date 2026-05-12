@@ -1,6 +1,6 @@
 import type { Building, Room, RouteOption } from '../constants/mockData';
 
-const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://10.110.212.218:3000';
+const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://10.110.129.176:3000';
 
 export async function getBuildings(): Promise<Building[]> {
   const response = await fetch(`${BASE_URL}/api/buildings`);
@@ -77,6 +77,54 @@ export async function fetchClassSchedule(): Promise<ClassScheduleEntry[]> {
   }
   return res.json();
 }
+
+
+export async function getLibraryAvailability(query: LibraryAvailabilityQuery): Promise<LibraryRoomResult[]> {
+  const params = new URLSearchParams({
+    date: query.date,
+    startTime: query.startTime,
+    duration: String(query.duration),
+    groupSize: String(query.groupSize),
+    floor: query.floor,
+    needsPower: String(query.needsPower),
+    needsADA: String(query.needsADA),
+  });
+
+  console.log("Fetching library availability with params:", params.toString());
+  const response = await fetch(`${BASE_URL}/api/library/availability?${params.toString()}`);
+  console.log("Library availability response status:", response.status);
+
+  if (!response.ok) {
+    let message = `Failed to fetch library availability: ${response.status}`;
+
+    try {
+      console.warn("Attempting to parse error response from library availability API");
+      const data = await response.json();
+      console.warn("Parsed error response data:", data);
+      if (data && typeof data.error === "string") {
+        message = data.error;
+      }
+    } catch {
+      // keep the status-based message
+      console.warn("Failed to parse error response from library availability API");
+      let text = await response.text();
+      console.warn("Error response text:", text);
+    }
+
+    throw new Error(message);
+  }
+  
+  console.log("Successfully fetched library availability");
+  const data = await response.json();
+  console.log("Library availability data:", data);
+
+  if (!Array.isArray(data)) {
+    throw new Error("Invalid library availability response: expected array");
+  }
+
+  return data;
+}
+
 
 export type ClassScheduleEntry = {
   id: string;
@@ -156,42 +204,3 @@ export type LibraryRoomResult = {
   nextAvailableStart: string | null;
   bookingUrl: string;
 };
-
-export async function getLibraryAvailability(
-  query: LibraryAvailabilityQuery,
-): Promise<LibraryRoomResult[]> {
-  const params = new URLSearchParams({
-    date: query.date,
-    startTime: query.startTime,
-    duration: String(query.duration),
-    groupSize: String(query.groupSize),
-    floor: query.floor,
-    needsPower: String(query.needsPower),
-    needsADA: String(query.needsADA),
-  });
-
-  const response = await fetch(`${BASE_URL}/api/library/availability?${params.toString()}`);
-
-  if (!response.ok) {
-    let message = `Failed to fetch library availability: ${response.status}`;
-
-    try {
-      const data = await response.json();
-      if (data && typeof data.error === "string") {
-        message = data.error;
-      }
-    } catch {
-      // keep the status-based message
-    }
-
-    throw new Error(message);
-  }
-
-  const data = await response.json();
-
-  if (!Array.isArray(data)) {
-    throw new Error("Invalid library availability response: expected array");
-  }
-
-  return data;
-}

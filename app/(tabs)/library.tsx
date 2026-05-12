@@ -5,11 +5,12 @@
  * Final booking stays in LibCal WebView so CPP SSO is handled by CPP.
  */
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import {
   ActivityIndicator,
   Animated,
+  Easing,
   Linking,
   Pressable,
   ScrollView,
@@ -72,6 +73,24 @@ type RoomWithSlots = {
 };
 
 type Step = "filter" | "results" | "booking";
+
+type AutomationStage =
+  | "loading"
+  | "preparing"
+  | "scanning-date-pages"
+  | "selecting-slot"
+  | "setting-duration"
+  | "slot-prepared"
+  | "submitting-times"
+  | "handoff"
+  | "ready-for-user"
+  | "failed";
+
+type LibCalAutomationMessage = {
+  type?: string;
+  stage?: string;
+  details?: unknown;
+};
 
 function getDays() {
   return Array.from({ length: 7 }, (_, i) => {
@@ -179,15 +198,50 @@ function buildInjectJS(
   var attempts = 0;
 
   function log(stage, details) {
+    var payload = {
+      type: 'broncoPathLibCal',
+      stage: stage,
+      details: details || null,
+      at: new Date().toISOString()
+    };
+
+    try {
+      console.log('[BroncoPath LibCal]', stage, details || null);
+    } catch (e) {}
+
     try {
       if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
-        window.ReactNativeWebView.postMessage(JSON.stringify({
-          type: 'broncoPathLibCal',
-          stage: stage,
-          details: details || null
-        }));
+        window.ReactNativeWebView.postMessage(JSON.stringify(payload));
       }
     } catch (e) {}
+  }
+
+  function summarizeSlot(slot) {
+    if (!slot) return null;
+
+    return {
+      itemId: slot.itemId,
+      eid: slot.eid,
+      id: slot.id,
+      start: slot.start,
+      normalizedStart: normalizeSlotStart(slot.start),
+      status: slot.status,
+      className: slot.className,
+      classNames: slot.classNames,
+      hasChecksum: !!slot.checksum,
+      checksumPrefix: slot.checksum ? String(slot.checksum).slice(0, 8) : null
+    };
+  }
+
+  function summarizeSlots(slots, limit) {
+    var output = [];
+    var max = Math.min(slots.length, limit || 10);
+
+    for (var i = 0; i < max; i++) {
+      output.push(summarizeSlot(slots[i]));
+    }
+
+    return output;
   }
 
   function normalize(value) {
@@ -195,9 +249,27 @@ function buildInjectJS(
   }
 
   function normalizeSlotStart(value) {
-    var text = String(value || '').replace(' ', 'T');
-    var match = text.match(/(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/);
-    return match ? match[1] + 'T' + match[2] : '';
+    var text = String(value || '').trim();
+
+    // Accept both:
+    // 2026-05-15 10:00:00
+    // 2026-05-15T10:00:00
+    text = text.replace(' ', 'T');
+
+    var datePart = text.slice(0, 10);
+    var timePart = text.slice(11, 16);
+
+    if (
+      datePart.length === 10 &&
+      timePart.length === 5 &&
+      datePart.charAt(4) === '-' &&
+      datePart.charAt(7) === '-' &&
+      timePart.charAt(2) === ':'
+    ) {
+      return datePart + 'T' + timePart;
+    }
+
+    return '';
   }
 
   function addDays(dateText, days) {
@@ -258,43 +330,200 @@ function buildInjectJS(
     });
   }
 
-  function fetchSlotFromLibCal() {
-    var payload = {
-      lid: config.lid,
-      gid: config.gid,
-      eid: config.eid,
-      seat: 0,
-      seatId: 0,
-      zone: 0,
-      filters: '',
-      start: config.date,
-      end: addDays(config.date, 1),
-      bookings: currentBookings(),
-      pageIndex: 0,
-      pageSize: 1
-    };
+  function findMatchingSlotInData(data, pageIndex) {
+    var slots = Array.isArray(data && data.slots) ? data.slots : [];
 
-    return postJson('/spaces/availability/grid', payload).then(function(data) {
-      var slots = Array.isArray(data && data.slots) ? data.slots : [];
-      for (var i = 0; i < slots.length; i++) {
-        var slot = slots[i];
-        var itemId = Number(slot.itemId || slot.eid || slot.id);
-        if (itemId !== Number(config.eid)) continue;
-        if (normalizeSlotStart(slot.start) !== config.startMinute) continue;
+    log('grid-response-summary', {
+      pageIndex: pageIndex,
+      slotCount: slots.length,
+      keys: data ? Object.keys(data) : [],
+      windowEnd: data && data.windowEnd,
+      isPreCreatedBooking: data && data.isPreCreatedBooking,
+      firstSlots: summarizeSlots(slots, 8)
+    });
 
-        var classText = normalize([slot.className, slot.classNames].flat ? [slot.className, slot.classNames].flat().join(' ') : String(slot.className || '') + ' ' + String(slot.classNames || ''));
-        var unavailable = classText.indexOf('checkout') !== -1 ||
-          classText.indexOf('unavailable') !== -1 ||
-          classText.indexOf('padding') !== -1 ||
-          classText.indexOf('booked') !== -1 ||
-          classText.indexOf('pending') !== -1 ||
-          slot.status === 1 ||
-          slot.status === '1';
+    var sawSameRoom = false;
+    var sawSameTime = false;
+    var sawSameRoomAndTime = false;
 
-        if (!unavailable && slot.checksum) return slot;
+    for (var i = 0; i < slots.length; i++) {
+      var slot = slots[i];
+
+      var itemId = Number(slot.itemId || slot.eid || slot.id);
+      var expectedEid = Number(config.eid);
+      var normalizedStart = normalizeSlotStart(slot.start);
+
+      var sameRoom = itemId === expectedEid;
+      var sameTime = normalizedStart === config.startMinute;
+
+      if (sameRoom) sawSameRoom = true;
+      if (sameTime) sawSameTime = true;
+      if (sameRoom && sameTime) sawSameRoomAndTime = true;
+
+      if (!sameRoom || !sameTime) {
+        continue;
       }
 
-      throw new Error('Matching LibCal slot was not returned by /spaces/availability/grid');
+      var classText = normalize(
+        [slot.className, slot.classNames].flat
+          ? [slot.className, slot.classNames].flat().join(' ')
+          : String(slot.className || '') + ' ' + String(slot.classNames || '')
+      );
+
+      var unavailable = classText.indexOf('checkout') !== -1 ||
+        classText.indexOf('unavailable') !== -1 ||
+        classText.indexOf('padding') !== -1 ||
+        classText.indexOf('booked') !== -1 ||
+        classText.indexOf('pending') !== -1 ||
+        slot.status === 1 ||
+        slot.status === '1';
+
+      log('matching-room-time-slot-found', {
+        pageIndex: pageIndex,
+        slot: summarizeSlot(slot),
+        classText: classText,
+        unavailable: unavailable,
+        hasChecksum: !!slot.checksum
+      });
+
+      if (!unavailable && slot.checksum) {
+        return slot;
+      }
+
+      log('matching-slot-rejected', {
+        pageIndex: pageIndex,
+        reason: unavailable
+          ? 'slot-was-marked-unavailable'
+          : 'slot-had-no-checksum',
+        slot: summarizeSlot(slot),
+        classText: classText
+      });
+    }
+
+    log('no-matching-slot-on-page', {
+      pageIndex: pageIndex,
+      expectedEid: config.eid,
+      expectedStartMinute: config.startMinute,
+      sawSameRoom: sawSameRoom,
+      sawSameTime: sawSameTime,
+      sawSameRoomAndTime: sawSameRoomAndTime,
+      slotCount: slots.length
+    });
+
+    return null;
+  }
+
+ function fetchSlotFromLibCal() {
+    var pageSize = Number((window.springyPage && springyPage.pageSize) || 18);
+    var resourceRows = Number((window.springyPage && (springyPage.resourceRows || springyPage.resourceCount)) || 0);
+
+    var totalPages = resourceRows > 0
+      ? Math.ceil(resourceRows / pageSize)
+      : 3;
+
+    totalPages = Math.max(1, Math.min(totalPages, 3));
+
+    var pageIndexes = [];
+    for (var p = 0; p < totalPages; p++) {
+      pageIndexes.push(p);
+    }
+
+    log('grid-pagination-plan', {
+      pageIndexes: pageIndexes,
+      pageSize: pageSize,
+      resourceRows: resourceRows,
+      springyPage: window.springyPage ? {
+        pageIndex: springyPage.pageIndex,
+        pageSize: springyPage.pageSize,
+        resourceRows: springyPage.resourceRows,
+        resourceCount: springyPage.resourceCount,
+        locationId: springyPage.locationId,
+        groupId: springyPage.groupId,
+        itemId: springyPage.itemId,
+        isSeatBooking: springyPage.isSeatBooking,
+        seatId: springyPage.seatId,
+        zoneId: springyPage.zoneId,
+        filterIds: springyPage.filterIds
+      } : null,
+      config: {
+        eid: config.eid,
+        gid: config.gid,
+        lid: config.lid,
+        roomName: config.roomName,
+        date: config.date,
+        startMinute: config.startMinute,
+        startIso: config.startIso,
+        endIso: config.endIso
+      }
+    });
+
+    var chain = Promise.resolve(null);
+
+    pageIndexes.forEach(function(pageIndex) {
+      chain = chain.then(function(foundSlot) {
+        if (foundSlot) return foundSlot;
+
+        var payload = {
+          lid: config.lid,
+
+          // Important: keep your target gid/eid.
+          gid: config.gid,
+          eid: config.eid,
+
+          seat: window.springyPage ? springyPage.isSeatBooking : 0,
+          seatId: window.springyPage ? springyPage.seatId : 0,
+          zone: window.springyPage ? springyPage.zoneId : 0,
+          filters: window.springyPage ? springyPage.filterIds : '',
+
+          start: config.date,
+          end: addDays(config.date, 1),
+          bookings: currentBookings(),
+          pageIndex: pageIndex,
+          pageSize: pageSize
+        };
+
+        log('grid-request-start', {
+          pageIndex: pageIndex,
+          payload: payload
+        });
+
+        return postJson('/spaces/availability/grid', payload)
+          .then(function(data) {
+            log('grid-request-success', {
+              pageIndex: pageIndex,
+              hasData: !!data,
+              keys: data ? Object.keys(data) : [],
+              slotCount: Array.isArray(data && data.slots) ? data.slots.length : null
+            });
+
+            var slot = findMatchingSlotInData(data, pageIndex);
+
+            if (slot) {
+              log('found-slot-on-page', {
+                pageIndex: pageIndex,
+                slot: summarizeSlot(slot)
+              });
+
+              return slot;
+            }
+
+            return null;
+          })
+          .catch(function(error) {
+            log('grid-request-failed', {
+              pageIndex: pageIndex,
+              reason: error && error.message ? error.message : String(error)
+            });
+
+            return null;
+          });
+      });
+    });
+
+    return chain.then(function(foundSlot) {
+      if (foundSlot) return foundSlot;
+
+      throw new Error('Matching LibCal slot was not returned by /spaces/availability/grid on any pageIndex');
     });
   }
 
@@ -315,8 +544,37 @@ function buildInjectJS(
       bookings: currentBookings()
     };
 
+    log('booking-add-request', {
+      payload: {
+        add: {
+          eid: payload.add.eid,
+          seat_id: payload.add.seat_id,
+          gid: payload.add.gid,
+          lid: payload.add.lid,
+          start: payload.add.start,
+          checksumPrefix: payload.add.checksum ? String(payload.add.checksum).slice(0, 8) : null
+        },
+        lid: payload.lid,
+        gid: payload.gid,
+        start: payload.start,
+        end: payload.end,
+        bookingsCount: Array.isArray(payload.bookings) ? payload.bookings.length : null
+      },
+      slot: summarizeSlot(slot)
+    });
+
     return postJson('/spaces/availability/booking/add', payload).then(function(data) {
+      log('booking-add-response', {
+        hasData: !!data,
+        keys: data ? Object.keys(data) : [],
+        error: data && data.error,
+        limitIssues: data && data.limitIssues,
+        bookingsCount: Array.isArray(data && data.bookings) ? data.bookings.length : null,
+        hasGridUpdateData: !!(data && data.gridUpdateData)
+      });
+
       if (data && data.error) throw new Error(data.error);
+
       try {
         if (typeof pendingBookingsLimitIssues !== 'undefined') {
           pendingBookingsLimitIssues = data.limitIssues || [];
@@ -327,9 +585,22 @@ function buildInjectJS(
         if (window.renderPendingRoomBookings) {
           renderPendingRoomBookings();
         }
+
+        log('booking-add-rendered-pending-bookings', {
+          pendingBookingsCount: typeof pendingRoomBookings !== 'undefined'
+            ? pendingRoomBookings.length
+            : null,
+          endSelectCount: document.querySelectorAll('select.b-end-date').length,
+          submitButtonExists: !!document.querySelector('#submit_times')
+        });
       } catch (e) {
+        log('booking-add-render-failed', {
+          reason: e.message || String(e)
+        });
+
         throw new Error('LibCal accepted the slot, but BroncoPath could not render the pending booking: ' + e.message);
       }
+
       return data;
     });
   }
@@ -339,12 +610,31 @@ function buildInjectJS(
       var tries = 0;
       var timer = setInterval(function() {
         tries += 1;
+
         var selects = Array.prototype.slice.call(document.querySelectorAll('select.b-end-date'));
+
+        if (tries === 1 || tries % 5 === 0 || selects.length > 0) {
+          log('waiting-for-end-select', {
+            tries: tries,
+            selectCount: selects.length,
+            duration: config.duration,
+            formBoxVisible: !!document.querySelector('#s-lc-eq-form-box'),
+            pendingBookingEls: document.querySelectorAll('.s-lc-pending-booking').length,
+            submitButtonExists: !!document.querySelector('#submit_times')
+          });
+        }
+
         if (selects.length > 0 || config.duration === 180) {
           clearInterval(timer);
+          log('end-select-ready', {
+            tries: tries,
+            selectCount: selects.length,
+            duration: config.duration
+          });
           resolve(selects);
           return;
         }
+
         if (tries > 40) {
           clearInterval(timer);
           reject(new Error('LibCal end-time dropdown did not appear'));
@@ -354,16 +644,45 @@ function buildInjectJS(
   }
 
   function selectEndTime(selects) {
-    if (!selects || selects.length === 0) return Promise.resolve();
+    if (!selects || selects.length === 0) {
+      log('select-end-time-skipped', {
+        reason: 'no-selects',
+        duration: config.duration
+      });
+      return Promise.resolve();
+    }
 
     var targetEnd = normalizeSlotStart(config.endIso);
+
+    log('select-end-time-started', {
+      targetEnd: targetEnd,
+      endIso: config.endIso,
+      endValueSpace: config.endValueSpace,
+      endLabel: config.endLabel,
+      selectCount: selects.length
+    });
+
     for (var i = 0; i < selects.length; i++) {
       var select = selects[i];
       var options = Array.prototype.slice.call(select.options || []);
+
+      log('end-select-options', {
+        selectIndex: i,
+        optionCount: options.length,
+        options: options.slice(0, 12).map(function(option) {
+          return {
+            value: option.value,
+            normalizedValue: normalizeSlotStart(option.value),
+            text: option.textContent
+          };
+        })
+      });
+
       for (var j = 0; j < options.length; j++) {
         var option = options[j];
         var value = String(option.value || '');
         var label = normalize(option.textContent || '');
+
         if (
           normalizeSlotStart(value) === targetEnd ||
           value.indexOf(config.endValueSpace) !== -1 ||
@@ -371,24 +690,76 @@ function buildInjectJS(
         ) {
           select.value = option.value;
           select.dispatchEvent(new Event('change', { bubbles: true }));
-          log('selected-end-time', { value: option.value });
-          return new Promise(function(resolve) { setTimeout(resolve, 1200); });
+
+          log('selected-end-time', {
+            value: option.value,
+            text: option.textContent,
+            normalizedValue: normalizeSlotStart(option.value)
+          });
+
+          return new Promise(function(resolve) {
+            setTimeout(resolve, 1200);
+          });
         }
       }
     }
 
+    log('select-end-time-failed', {
+      targetEnd: targetEnd,
+      endIso: config.endIso,
+      endValueSpace: config.endValueSpace,
+      endLabel: config.endLabel
+    });
+
     throw new Error('Requested end time was not available in LibCal dropdown');
   }
 
+  function delayThenSubmitTimes() {
+    return new Promise(function(resolve) {
+      setTimeout(function() {
+        submitTimes();
+        log('submit-times-invoked');
+        resolve();
+      }, 500);
+    });
+  }
+
   function submitTimes() {
-    if (window.submitPendingTimes) {
+    log('submit-times-started', {
+      submitFunctionExists: typeof window.submitPendingTimes === 'function',
+      formExists: !!document.querySelector('#s-lc-eq-form-times'),
+      buttonExists: !!document.querySelector('#submit_times'),
+      buttonDisabled: !!(document.querySelector('#submit_times') && document.querySelector('#submit_times').disabled),
+      pendingBookingsCount: typeof pendingRoomBookings !== 'undefined' ? pendingRoomBookings.length : null
+    });
+
+    if (typeof window.submitPendingTimes === 'function') {
       log('submitting-times-via-libcal-function');
-      submitPendingTimes();
+      window.submitPendingTimes();
+      return;
+    }
+
+    var form = document.querySelector('#s-lc-eq-form-times');
+    if (form) {
+      log('submitting-times-via-form-submit-event');
+
+      var event;
+      if (typeof Event === 'function') {
+        event = new Event('submit', { bubbles: true, cancelable: true });
+      } else {
+        event = document.createEvent('Event');
+        event.initEvent('submit', true, true);
+      }
+
+      form.dispatchEvent(event);
       return;
     }
 
     var button = document.querySelector('#submit_times');
-    if (!button || button.disabled) throw new Error('Submit Times button is unavailable');
+    if (!button || button.disabled) {
+      throw new Error('Submit Times button is unavailable');
+    }
+
     log('submitting-times-via-button');
     button.scrollIntoView({ block: 'center' });
     button.click();
@@ -441,7 +812,7 @@ function buildInjectJS(
       slot.click();
       waitForEndSelect()
         .then(selectEndTime)
-        .then(function() { setTimeout(submitTimes, 500); })
+        .then(delayThenSubmitTimes)
         .catch(function(error) { log('failed', { reason: error.message || String(error) }); });
     }, 250);
   }
@@ -485,6 +856,70 @@ true;
   `.trim();
 }
 
+
+function stageFromLibCalMessage(stage: string | undefined): AutomationStage {
+  switch (stage) {
+    case "direct-libcal-flow-started":
+      return "preparing";
+    case "syncing-date-page":
+    case "scanning-date-pages":
+      return "scanning-date-pages";
+    case "fetching-slot":
+    case "found-slot-checksum":
+    case "adding-pending-booking":
+    case "dom-click-fallback-started":
+      return "selecting-slot";
+    case "selecting-end-time":
+    case "selected-end-time":
+      return "setting-duration";
+    case "slot-prepared":
+      return "slot-prepared";
+    case "submitting-times":
+      return "submitting-times";
+    case "sso-redirect-ready":
+      return "handoff";
+    case "booking-form-ready":
+      return "ready-for-user";
+    case "manual-needed":
+    case "failed":
+      return "failed";
+    default:
+      return "preparing";
+  }
+}
+
+function detailToText(details: unknown): string | null {
+  if (!details || typeof details !== "object") return null;
+  const maybeReason = (details as { reason?: unknown }).reason;
+  if (typeof maybeReason === "string" && maybeReason.trim()) return maybeReason;
+  return null;
+}
+
+function isLikelySsoOrCheckoutUrl(url: string): boolean {
+  const lower = url.toLowerCase();
+  if (!lower) return false;
+
+  if (
+    lower.includes("libauth") ||
+    lower.includes("sso") ||
+    lower.includes("saml") ||
+    lower.includes("shibboleth") ||
+    lower.includes("/login") ||
+    lower.includes("/auth") ||
+    lower.includes("idp") ||
+    lower.includes("okta")
+  ) {
+    return true;
+  }
+
+  try {
+    const parsed = new URL(url);
+    return parsed.hostname.length > 0 && parsed.hostname !== "cpp.libcal.com";
+  } catch {
+    return false;
+  }
+}
+
 export default function LibraryScreen() {
   const days = useMemo(() => getDays(), []);
 
@@ -503,9 +938,13 @@ export default function LibraryScreen() {
   const [apiError, setApiError] = useState<string | null>(null);
   const [results, setResults] = useState<RoomWithSlots[]>([]);
   const [bookingRoom, setBookingRoom] = useState<LibraryRoomResult | null>(null);
-  const [webViewReady, setWebViewReady] = useState(false);
+  const [automationStage, setAutomationStage] = useState<AutomationStage>("loading");
+  const [automationDetail, setAutomationDetail] = useState<string | null>(null);
+  const [webViewVisible, setWebViewVisible] = useState(false);
 
   const slideAnim = useRef(new Animated.Value(0)).current;
+  const revealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hardRevealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const animateTo = useCallback((direction: 1 | -1) => {
     slideAnim.setValue(direction * 40);
@@ -517,6 +956,47 @@ export default function LibraryScreen() {
     }).start();
   }, [slideAnim]);
 
+  const clearRevealTimer = useCallback(() => {
+    if (revealTimerRef.current) {
+      clearTimeout(revealTimerRef.current);
+      revealTimerRef.current = null;
+    }
+  }, []);
+
+  const clearHardRevealTimer = useCallback(() => {
+    if (hardRevealTimerRef.current) {
+      clearTimeout(hardRevealTimerRef.current);
+      hardRevealTimerRef.current = null;
+    }
+  }, []);
+
+  const revealWebViewForUser = useCallback((stage: AutomationStage = "ready-for-user", detail?: string) => {
+    clearRevealTimer();
+    clearHardRevealTimer();
+    if (detail) setAutomationDetail(detail);
+    setAutomationStage(stage);
+    setWebViewVisible(true);
+  }, [clearHardRevealTimer, clearRevealTimer]);
+
+  const scheduleWebViewReveal = useCallback((delayMs: number) => {
+    clearRevealTimer();
+    revealTimerRef.current = setTimeout(() => {
+      revealWebViewForUser("ready-for-user");
+    }, delayMs);
+  }, [clearRevealTimer, revealWebViewForUser]);
+
+  const scheduleHardReveal = useCallback((delayMs: number, detail: string) => {
+    clearHardRevealTimer();
+    hardRevealTimerRef.current = setTimeout(() => {
+      revealWebViewForUser("failed", detail);
+    }, delayMs);
+  }, [clearHardRevealTimer, revealWebViewForUser]);
+
+  useEffect(() => () => {
+    clearRevealTimer();
+    clearHardRevealTimer();
+  }, [clearHardRevealTimer, clearRevealTimer]);
+
   async function handleSearch() {
     setStep("results");
     setLoading(true);
@@ -525,7 +1005,9 @@ export default function LibraryScreen() {
     animateTo(1);
 
     try {
+      console.log("Searching for library rooms with filters:", filters);
       const rooms = await getLibraryAvailability(filters);
+      console.log("Received library availability results:", rooms);
       setResults(rooms.map((room) => ({ room, isAvailable: room.isAvailable })));
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown LibCal error";
@@ -536,31 +1018,93 @@ export default function LibraryScreen() {
   }
 
   function openBooking(room: LibraryRoomResult) {
+    clearRevealTimer();
+    clearHardRevealTimer();
     setBookingRoom(room);
-    setWebViewReady(false);
+    setAutomationStage("loading");
+    setAutomationDetail(null);
+    setWebViewVisible(false);
     animateTo(1);
     setStep("booking");
+    scheduleHardReveal(30000, "LibCal did not finish the automatic handoff. The WebView is open so you can complete it manually.");
   }
 
   function goBack() {
     animateTo(-1);
     if (step === "booking") {
+      clearRevealTimer();
+      clearHardRevealTimer();
       setStep("results");
       setBookingRoom(null);
-      setWebViewReady(false);
+      setAutomationStage("loading");
+      setAutomationDetail(null);
+      setWebViewVisible(false);
     } else {
       setStep("filter");
     }
   }
 
+  function handleLibCalMessage(event: { nativeEvent: { data: string } }) {
+    let message: LibCalAutomationMessage;
+    try {
+      message = JSON.parse(event.nativeEvent.data) as LibCalAutomationMessage;
+    } catch {
+      return;
+    }
+
+    if (message.type !== "broncoPathLibCal") return;
+
+    const nextStage = stageFromLibCalMessage(message.stage);
+    setAutomationDetail(detailToText(message.details));
+
+    if (message.stage === "slot-prepared") {
+      setAutomationStage("slot-prepared");
+      scheduleHardReveal(20000, "The slot was selected, but LibCal did not finish opening CPP SSO. Continue manually in the WebView.");
+      return;
+    }
+
+    if (message.stage === "submitting-times") {
+      setAutomationStage("submitting-times");
+      scheduleHardReveal(20000, "LibCal did not return an SSO handoff. The WebView is open so you can press Submit Times manually.");
+      return;
+    }
+
+    if (message.stage === "sso-redirect-ready") {
+      clearHardRevealTimer();
+      setAutomationStage("handoff");
+      scheduleWebViewReveal(1500);
+      return;
+    }
+
+    if (message.stage === "booking-form-ready") {
+      revealWebViewForUser("ready-for-user");
+      return;
+    }
+
+    if (nextStage === "failed") {
+      clearHardRevealTimer();
+      revealWebViewForUser("failed");
+      return;
+    }
+
+    setAutomationStage(nextStage);
+  }
+
+  function handleBookingNavigation(nav: WebViewNavigation) {
+    if (isLikelySsoOrCheckoutUrl(nav.url)) {
+      revealWebViewForUser("ready-for-user");
+    }
+  }
+
   const bookingUrl = bookingRoom?.bookingUrl ?? "";
+  const showChromeHeader = step !== "filter" && !(step === "booking" && !webViewVisible);
 
   return (
     <SafeAreaView
       edges={["top"]}
       style={{ flex: 1, backgroundColor: Colors.bg }}
     >
-      {step !== "filter" && (
+      {showChromeHeader && (
         <View
           style={{
             flexDirection: "row",
@@ -615,8 +1159,12 @@ export default function LibraryScreen() {
             injectJS={buildInjectJS(filters.date, filters.startTime, filters.duration, bookingRoom)}
             room={bookingRoom}
             filters={filters}
-            ready={webViewReady}
-            onReady={() => setWebViewReady(true)}
+            automationStage={automationStage}
+            automationDetail={automationDetail}
+            webViewVisible={webViewVisible}
+            onMessage={handleLibCalMessage}
+            onNavigationStateChange={handleBookingNavigation}
+            onCancel={goBack}
           />
         )}
       </Animated.View>
@@ -944,93 +1492,557 @@ type BookingStepProps = {
   injectJS: string;
   room: LibraryRoomResult;
   filters: Filters;
-  ready: boolean;
-  onReady: () => void;
+  automationStage: AutomationStage;
+  automationDetail: string | null;
+  webViewVisible: boolean;
+  onMessage: (event: { nativeEvent: { data: string } }) => void;
+  onNavigationStateChange: (nav: WebViewNavigation) => void;
+  onCancel: () => void;
 };
 
-function BookingStep({ url, injectJS, room, filters, ready, onReady }: BookingStepProps) {
+function BookingStep({
+  url,
+  injectJS,
+  room,
+  filters,
+  automationStage,
+  automationDetail,
+  webViewVisible,
+  onMessage,
+  onNavigationStateChange,
+  onCancel,
+}: BookingStepProps) {
   const endTime = addMins(filters.startTime, filters.duration);
 
   return (
     <View style={{ flex: 1 }}>
-      <View style={{
-        backgroundColor: Colors.surface,
-        borderBottomColor: Colors.border,
-        borderBottomWidth: 1,
-        paddingHorizontal: 20,
-        paddingVertical: 10,
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 10,
-      }}>
+      {webViewVisible && (
         <View style={{
-          width: 8,
-          height: 8,
-          borderRadius: 4,
-          backgroundColor: room.isAvailable ? Colors.accent : Colors.med,
-        }} />
-        <Text style={{ color: Colors.text, fontFamily: Fonts.bodyMedium, fontSize: 13, flex: 1 }} numberOfLines={1}>
-          {room.name}
-        </Text>
-        <Text style={{ color: Colors.muted, fontFamily: Fonts.mono, fontSize: 11 }}>
-          {filters.date} {to12h(filters.startTime)}–{to12h(endTime)}
-        </Text>
-      </View>
-
-      {!ready && (
-        <View style={{
-          position: "absolute",
-          top: 64,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: Colors.bg,
+          backgroundColor: Colors.surface,
+          borderBottomColor: Colors.border,
+          borderBottomWidth: 1,
+          paddingHorizontal: 20,
+          paddingVertical: 10,
+          flexDirection: "row",
           alignItems: "center",
-          justifyContent: "center",
-          zIndex: 10,
+          gap: 10,
         }}>
-          <ActivityIndicator size="large" color={Colors.accent} />
-          <Text style={{ color: Colors.muted, fontFamily: Fonts.body, fontSize: 13, marginTop: 14 }}>
-            Loading LibCal…
+          <View style={{
+            width: 8,
+            height: 8,
+            borderRadius: 4,
+            backgroundColor: room.isAvailable ? Colors.accent : Colors.med,
+          }} />
+          <Text style={{ color: Colors.text, fontFamily: Fonts.bodyMedium, fontSize: 13, flex: 1 }} numberOfLines={1}>
+            {room.name}
+          </Text>
+          <Text style={{ color: Colors.muted, fontFamily: Fonts.mono, fontSize: 11 }}>
+            {to12h(filters.startTime)}-{to12h(endTime)}
           </Text>
         </View>
       )}
 
-      <WebView
-        source={{ uri: url }}
-        injectedJavaScript={injectJS}
-        onLoadEnd={onReady}
-        javaScriptEnabled
-        domStorageEnabled
-        style={{ flex: 1, backgroundColor: Colors.bg }}
-        onMessage={(event) => {
-          console.log("LibCal WebView:", event.nativeEvent.data);
-        }}
-        onNavigationStateChange={(nav: WebViewNavigation) => {
-          if (nav.url.includes("/booking/")) {
-            // User can view LibCal confirmation in the WebView.
-          }
-        }}
-      />
+      <View style={{ flex: 1 }}>
+        <View
+          pointerEvents={webViewVisible ? "auto" : "none"}
+          style={{ flex: 1, opacity: webViewVisible ? 1 : 0 }}
+        >
+          <WebView
+            source={{ uri: url }}
+            injectedJavaScript={injectJS}
+            javaScriptEnabled
+            domStorageEnabled
+            style={{ flex: 1, backgroundColor: Colors.bg }}
+            onMessage={onMessage}
+            onNavigationStateChange={onNavigationStateChange}
+          />
+        </View>
 
-      <View style={{
-        backgroundColor: Colors.surface,
-        borderTopColor: Colors.border,
-        borderTopWidth: 1,
-        paddingHorizontal: 20,
-        paddingVertical: 10,
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 8,
-      }}>
-        <Feather name="lock" size={12} color={Colors.muted} />
-        <Text style={{ color: Colors.muted, fontFamily: Fonts.body, fontSize: 11, flex: 1, lineHeight: 16 }}>
-          BroncoPath will try to select the slot and open CPP SSO. After login, confirm the final LibCal form.
-        </Text>
+        {!webViewVisible && (
+          <ReservationPrepOverlay
+            room={room}
+            filters={filters}
+            stage={automationStage}
+            detail={automationDetail}
+            onCancel={onCancel}
+          />
+        )}
+      </View>
+
+      {webViewVisible && (
+        <View style={{
+          backgroundColor: Colors.surface,
+          borderTopColor: Colors.border,
+          borderTopWidth: 1,
+          paddingHorizontal: 20,
+          paddingVertical: 10,
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 8,
+        }}>
+          <Feather
+            name={automationStage === "failed" ? "alert-triangle" : "lock"}
+            size={12}
+            color={automationStage === "failed" ? Colors.med : Colors.muted}
+          />
+          <Text style={{ color: Colors.muted, fontFamily: Fonts.body, fontSize: 11, flex: 1, lineHeight: 16 }}>
+            {automationStage === "failed"
+              ? "Automation could not finish. Complete the selection manually in LibCal; no reservation has been made yet."
+              : "Continue in CPP SSO or LibCal. The room is not reserved until you submit the final LibCal form."}
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
+function ReservationPrepOverlay({
+  room,
+  filters,
+  stage,
+  detail,
+  onCancel,
+}: {
+  room: LibraryRoomResult;
+  filters: Filters;
+  stage: AutomationStage;
+  detail: string | null;
+  onCancel: () => void;
+}) {
+  const progress = useRef(new Animated.Value(0)).current;
+  const press = useRef(new Animated.Value(0)).current;
+  const endTime = addMins(filters.startTime, filters.duration);
+  const activeIndex = prepActiveIndex(stage);
+  const cards = [
+    {
+      index: 0,
+      icon: "home" as const,
+      prompt: "Which study room?",
+      answer: room.name,
+      hint: room.grouping,
+    },
+    {
+      index: 1,
+      icon: "calendar" as const,
+      prompt: "When should it start?",
+      answer: `${to12h(filters.startTime)}`,
+      hint: filters.date,
+    },
+    {
+      index: 2,
+      icon: "watch" as const,
+      prompt: "How long should it last?",
+      answer: `${to12h(filters.startTime)} - ${to12h(endTime)}`,
+      hint: `${filters.duration} minutes`,
+    },
+    {
+      index: 3,
+      icon: "send" as const,
+      prompt: "Ready for CPP sign-in?",
+      answer: "Submit Times",
+      hint: "LibCal will hand this to CPP SSO",
+    },
+  ];
+  const visualCards = [...cards, { ...cards[0], index: 4 }];
+
+  useEffect(() => {
+    progress.setValue(0);
+    press.setValue(0);
+
+    function clickBeat() {
+      return Animated.sequence([
+        Animated.delay(stage === "submitting-times" || stage === "handoff" ? 260 : 520),
+        Animated.timing(press, {
+          toValue: 1,
+          duration: 105,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(press, {
+          toValue: 0,
+          duration: 155,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.delay(stage === "submitting-times" || stage === "handoff" ? 420 : 700),
+      ]);
+    }
+
+    function slideTo(index: number) {
+      return Animated.timing(progress, {
+        toValue: index,
+        duration: 460,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      });
+    }
+
+    const flowAnimation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(progress, {
+          toValue: 0,
+          duration: 1,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        }),
+        clickBeat(),
+        slideTo(1),
+        clickBeat(),
+        slideTo(2),
+        clickBeat(),
+        slideTo(3),
+        clickBeat(),
+        slideTo(4),
+        clickBeat(),
+      ]),
+    );
+
+    flowAnimation.start();
+
+    return () => {
+      flowAnimation.stop();
+    };
+  }, [press, progress, stage]);
+
+  const pointerY = progress.interpolate({
+    inputRange: [0, 1, 2, 3, 4],
+    outputRange: [50, 72, 94, 114, 50],
+  });
+  const pointerScale = press.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 0.82],
+  });
+
+  return (
+    <View style={{
+      position: "absolute",
+      top: 0,
+      right: 0,
+      bottom: 0,
+      left: 0,
+      backgroundColor: Colors.bg,
+      paddingHorizontal: 24,
+      paddingTop: 18,
+      paddingBottom: 24,
+      zIndex: 20,
+    }}>
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+        <Pressable
+          onPress={onCancel}
+          hitSlop={10}
+          style={{
+            width: 38,
+            height: 38,
+            borderRadius: 19,
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: Colors.surface,
+            borderColor: Colors.border,
+            borderWidth: 1,
+          }}
+        >
+          <Feather name="x" size={17} color={Colors.muted} />
+        </Pressable>
+
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <View style={{
+            width: 7,
+            height: 7,
+            borderRadius: 4,
+            backgroundColor: stage === "failed" ? Colors.med : Colors.accent,
+          }} />
+          <Text style={{ color: Colors.muted, fontFamily: Fonts.mono, fontSize: 11 }}>
+            LibCal handoff
+          </Text>
+        </View>
+      </View>
+
+      <View style={{ flex: 1, justifyContent: "center" }}>
+        <View style={{ marginBottom: 28 }}>
+          <Text style={{
+            color: Colors.accent,
+            fontFamily: Fonts.mono,
+            fontSize: 12,
+            marginBottom: 12,
+          }}>
+            1 → preparing your reservation
+          </Text>
+          <Text style={{ color: Colors.text, fontFamily: Fonts.display, fontSize: 34, lineHeight: 40 }}>
+            Filling LibCal for you.
+          </Text>
+          <Text style={{
+            color: Colors.muted,
+            fontFamily: Fonts.body,
+            fontSize: 13,
+            lineHeight: 20,
+            marginTop: 12,
+            maxWidth: 330,
+          }}>
+            {prepStageCopy(stage)}
+          </Text>
+        </View>
+
+        <View style={{
+          height: 292,
+          justifyContent: "center",
+          overflow: "hidden",
+        }}>
+          {visualCards.map((card) => (
+            <FlyingFormCard
+              key={`${card.index}-${card.prompt}`}
+              card={card}
+              progress={progress}
+              press={press}
+              active={activeIndex === (card.index === 4 ? 0 : card.index)}
+              isSubmit={card.index === 3}
+            />
+          ))}
+
+          <Animated.View style={{
+            position: "absolute",
+            right: 94,
+            top: 96,
+            transform: [
+              { translateY: pointerY },
+              { scale: pointerScale },
+            ],
+            shadowColor: "#000",
+            shadowOpacity: 0.26,
+            shadowRadius: 8,
+            shadowOffset: { width: 0, height: 4 },
+          }}>
+            <Feather name="mouse-pointer" size={24} color={Colors.accent} />
+          </Animated.View>
+        </View>
+
+        <View style={{
+          marginTop: 26,
+          backgroundColor: stage === "failed" ? Colors.medBg : Colors.surface,
+          borderColor: stage === "failed" ? Colors.medBorder : Colors.border,
+          borderWidth: 1,
+          borderRadius: 18,
+          paddingHorizontal: 14,
+          paddingVertical: 13,
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 10,
+        }}>
+          {stage === "failed" ? (
+            <Feather name="alert-triangle" size={15} color={Colors.med} />
+          ) : (
+            <ActivityIndicator size="small" color={Colors.accent} />
+          )}
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: stage === "failed" ? Colors.med : Colors.text, fontFamily: Fonts.bodySemiBold, fontSize: 12 }}>
+              {prepStageLabel(stage)}
+            </Text>
+            <Text style={{ color: Colors.muted, fontFamily: Fonts.body, fontSize: 11, marginTop: 2 }} numberOfLines={2}>
+              {detail ?? prepStageDetail(stage)}
+            </Text>
+          </View>
+        </View>
       </View>
     </View>
   );
 }
+
+function FlyingFormCard({
+  card,
+  progress,
+  press,
+  active,
+  isSubmit,
+}: {
+  card: {
+    index: number;
+    icon: keyof typeof Feather.glyphMap;
+    prompt: string;
+    answer: string;
+    hint: string;
+  };
+  progress: Animated.Value;
+  press: Animated.Value;
+  active: boolean;
+  isSubmit: boolean;
+}) {
+  const translateY = progress.interpolate({
+    inputRange: [card.index - 0.75, card.index, card.index + 0.75],
+    outputRange: [104, 0, -104],
+    extrapolate: "clamp",
+  });
+
+  const opacity = progress.interpolate({
+    inputRange: [card.index - 0.9, card.index - 0.2, card.index, card.index + 0.32, card.index + 0.9],
+    outputRange: [0, 0.42, 1, 0.58, 0],
+    extrapolate: "clamp",
+  });
+  const scale = progress.interpolate({
+    inputRange: [card.index - 0.75, card.index, card.index + 0.75],
+    outputRange: [0.94, 1, 0.94],
+    extrapolate: "clamp",
+  });
+  const submitScale = press.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 0.96],
+  });
+  const displayIndex = card.index === 4 ? 0 : card.index;
+
+  return (
+    <Animated.View style={{
+      position: "absolute",
+      left: 0,
+      right: 0,
+      opacity,
+      transform: [{ translateY }, { scale }],
+    }}>
+      <View style={{
+        backgroundColor: Colors.card,
+        borderColor: active ? Colors.accentBorder : Colors.borderMd,
+        borderWidth: 1,
+        borderRadius: 24,
+        padding: 20,
+      }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 18 }}>
+          <Text style={{ color: active ? Colors.accent : Colors.muted, fontFamily: Fonts.mono, fontSize: 12 }}>
+            {displayIndex + 1} →
+          </Text>
+          <Text style={{ color: Colors.text, fontFamily: Fonts.bodyMedium, fontSize: 15, flex: 1 }}>
+            {card.prompt}
+          </Text>
+        </View>
+
+        {isSubmit ? (
+          <Animated.View style={{
+            transform: [{ scale: submitScale }],
+            backgroundColor: active ? Colors.accent : Colors.accentBg,
+            borderColor: Colors.accentBorder,
+            borderWidth: 1,
+            borderRadius: 16,
+            paddingVertical: 15,
+            paddingHorizontal: 18,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 9,
+          }}>
+            <Feather name="send" size={15} color={active ? Colors.bg : Colors.accent} />
+            <Text style={{ color: active ? Colors.bg : Colors.accent, fontFamily: Fonts.bodySemiBold, fontSize: 14 }}>
+              {card.answer}
+            </Text>
+          </Animated.View>
+        ) : (
+          <View style={{
+            minHeight: 70,
+            backgroundColor: active ? Colors.accentBg : Colors.surface,
+            borderColor: active ? Colors.accentBorder : Colors.border,
+            borderWidth: 1,
+            borderRadius: 18,
+            paddingHorizontal: 16,
+            paddingVertical: 14,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 12,
+          }}>
+            <View style={{
+              width: 34,
+              height: 34,
+              borderRadius: 17,
+              backgroundColor: Colors.bg,
+              alignItems: "center",
+              justifyContent: "center",
+              borderColor: active ? Colors.accentBorder : Colors.border,
+              borderWidth: 1,
+            }}>
+              <Feather name={card.icon} size={15} color={active ? Colors.accent : Colors.muted} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: active ? Colors.accent : Colors.text, fontFamily: Fonts.bodySemiBold, fontSize: 15 }} numberOfLines={1}>
+                {card.answer}
+              </Text>
+              <Text style={{ color: Colors.muted, fontFamily: Fonts.body, fontSize: 11, marginTop: 4 }} numberOfLines={1}>
+                {card.hint}
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {isSubmit && (
+          <Text style={{ color: Colors.muted, fontFamily: Fonts.body, fontSize: 11, lineHeight: 16, marginTop: 12, textAlign: "center" }}>
+            {card.hint}
+          </Text>
+        )}
+      </View>
+    </Animated.View>
+  );
+}
+
+function prepActiveIndex(stage: AutomationStage): number {
+  if (stage === "selecting-slot") return 1;
+  if (stage === "setting-duration" || stage === "slot-prepared") return 2;
+  if (stage === "submitting-times" || stage === "handoff") return 3;
+  return 0;
+}
+
+function prepStageLabel(stage: AutomationStage): string {
+  switch (stage) {
+    case "loading":
+      return "Opening LibCal";
+    case "preparing":
+      return "Waiting for LibCal scripts";
+    case "scanning-date-pages":
+      return "Checking date and room pages";
+    case "selecting-slot":
+      return "Choosing the matching room slot";
+    case "setting-duration":
+      return "Setting the reservation length";
+    case "slot-prepared":
+      return "Slot prepared";
+    case "submitting-times":
+      return "Pressing Submit Times";
+    case "handoff":
+      return "Opening CPP SSO";
+    case "ready-for-user":
+      return "Ready for sign-in";
+    case "failed":
+      return "Manual completion needed";
+    default:
+      return "Preparing LibCal";
+  }
+}
+
+function prepStageDetail(stage: AutomationStage): string {
+  switch (stage) {
+    case "scanning-date-pages":
+      return "Trying the exact date, surrounding date windows, and all LibCal room pages.";
+    case "selecting-slot":
+      return "Using LibCal's slot checksum instead of clicking the visible grid only.";
+    case "setting-duration":
+      return "Updating the pending booking with LibCal's own end-time checksum.";
+    case "submitting-times":
+      return "The selected time is being handed to LibCal's SSO route.";
+    case "handoff":
+      return "CPP sign-in is loading. The WebView will appear next.";
+    case "failed":
+      return "The WebView will open so you can finish on LibCal.";
+    default:
+      return "Keep this screen open while BroncoPath prepares the LibCal form.";
+  }
+}
+
+function prepStageCopy(stage: AutomationStage): string {
+  switch (stage) {
+    case "scanning-date-pages":
+      return "BroncoPath is checking the selected room across LibCal's date window and room pages, not just the visible grid.";
+    case "submitting-times":
+    case "handoff":
+      return "The slot is selected. BroncoPath is pressing LibCal's Submit Times button so CPP can take over sign-in.";
+    case "failed":
+      return "BroncoPath could not finish the handoff. The WebView will be shown so you can complete it manually.";
+    default:
+      return "The room, start time, and duration are being selected inside LibCal. You will see CPP SSO when it needs your login.";
+  }
+}
+
 
 function FilterLabel({
   icon,

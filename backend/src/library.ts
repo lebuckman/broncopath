@@ -87,11 +87,16 @@ type LibraryRoomResult = LibCalRoom & {
 let metadataCache: LibCalMetadata | null = null;
 
 router.get("/availability", async (req, res) => {
+  console.log("Received library availability request with query:", req.query);
   try {
     const query = parseAvailabilityQuery(req.query as Record<string, unknown>);
+    console.log("Library availability query:", query);
     const session = await fetchLibCalPage(query.date);
+    console.log("Fetched LibCal page for date", query.date);
     const metadata = getMetadata(session.html);
+    console.log("Parsed LibCal metadata with", metadata.rooms.length, "rooms and", metadata.resourceRows, "resource rows");
     const slots = await fetchAllGridSlots(session, metadata, query.date);
+    console.log("Fetched LibCal grid with", slots.length, "slots for date", query.date);
     const results = buildResults(metadata.rooms, slots, query);
 
     res.setHeader("Cache-Control", "no-store");
