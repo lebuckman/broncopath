@@ -6,6 +6,7 @@ config({ path: '.env.local', override: true });
 import buildingsRouter from './buildings.ts';
 import campusGraphRouter from "./campusGraph.ts";
 import schedulesRouter from "./schedules.ts";
+import libraryRouter from "./library.ts";
 
 const app = express();
 const PORT = process.env.PORT ?? 3000;
@@ -22,6 +23,8 @@ app.use('/api/buildings', buildingsRouter);
 app.use("/api/campus-graph", campusGraphRouter);
 
 app.use("/api/schedules", schedulesRouter);
+
+app.use("/api/library", libraryRouter);
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
