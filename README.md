@@ -14,6 +14,8 @@ _Know your campus. Beat the crowd. Find your space._
 ![Node.js](https://img.shields.io/badge/Node.js-Express-339933?style=flat-square&logo=node.js&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/Neon-PostgreSQL-4ade80?style=flat-square&logo=postgresql&logoColor=white)
 
+<img src="./assets/Banner.png" alt="" />
+
 </div>
 
 ## What is BroncoPath?
@@ -24,12 +26,13 @@ BroncoPath is a mobile application that scrapes Cal Poly Pomona's publicly avail
 
 This project was created following Agile Methodologies (Scrum) with an AI-augmented workflow under CS4800 Software Engineering at Cal Poly Pomona (Spring 2026). View project deliverables in [`docs/deliverables/`](docs/deliverables/).
 
-| Feature           | Description                                                 |
-| ----------------- | ----------------------------------------------------------- |
-| 📊 Live Dashboard | Building-by-building occupancy overview at the current time |
-| 🗺️ Campus Map     | Interactive map with color-coded crowd density markers      |
-| 🚪 Room Finder    | Browse available classrooms and study rooms by building     |
-| 🧭 Route Planner  | Crowd-avoiding route suggestions between campus buildings   |
+| Feature           | Description                                                         |
+| ----------------- | ------------------------------------------------------------------- |
+| 📊 Live Dashboard | Building-by-building occupancy overview at the current time         |
+| 🗺️ Campus Map     | Interactive map with color-coded crowd density markers              |
+| 🚪 Room Finder    | Browse available classrooms and study rooms by building             |
+| 🧭 Route Planner  | Crowd-avoiding Dijkstra routes integrated directly into the Map tab |
+| 📚 Library        | CPP LibCal room booking via SSO handoff                             |
 
 ## Tech Stack
 
@@ -37,14 +40,17 @@ This project was created following Agile Methodologies (Scrum) with an AI-augmen
 
 - [React Native](https://reactnative.dev/) + [Expo SDK](https://expo.dev/) with [Expo Router v4](https://docs.expo.dev/router/introduction/)
 - [NativeWind v4](https://www.nativewind.dev/) — Tailwind CSS for React Native
-- [react-native-maps](https://github.com/react-native-maps/react-native-maps) — Apple Maps (no API key required)
+- [@maplibre/maplibre-react-native](https://github.com/maplibre/maplibre-react-native) — MapLibre GL for interactive campus map rendering
 - Custom hooks + module-level singleton cache — data fetching, prefetch on launch, 60s polling
+- Client-side Dijkstra routing engine over OSM-derived campus graph (shortest + least-crowded variants)
+- `expo-location` + MapLibre `LocationManager` — live GPS tracking with auto-reroute
 
 **Backend**
 
 - [Node.js](https://nodejs.org/) + [Express](https://expressjs.com/) — REST API
 - [Neon](https://neon.tech/) — serverless PostgreSQL
 - [Drizzle ORM](https://orm.drizzle.team/) — type-safe database queries
+- OSM campus graph (6,015 nodes / 12,700 edges) stored in Neon and served via `/api/campus-graph`
 
 **Data Pipeline**
 
@@ -106,20 +112,20 @@ broncopath/
 │   └── (tabs)/
 │       ├── _layout.tsx         # Tab navigator
 │       ├── index.tsx           # Home / Dashboard
-│       ├── map.tsx             # Campus Map
+│       ├── map.tsx             # Campus Map + integrated Route Planner
 │       ├── rooms.tsx           # Find a Room
-│       └── route.tsx           # Route Planner (in development)
+│       └── library.tsx         # CPP LibCal room booking (SSO handoff)
 │
 ├── components/
 │   ├── LoadingScreen.tsx       # Branded launch screen with data prefetch
 │   ├── ui/                     # Primitive components (badges, buttons, filters)
 │   ├── building/               # Building cards, accordions, detail sheet
-│   ├── map/                    # Map markers, legend
-│   └── route/                  # Route cards (in development)
+│   └── map/                    # Markers, FloatingMapSearchBar, RoutePlannerSheet
 │
 ├── constants/                  # Colors, fonts, types, campus config
-├── hooks/                      # useBuildings, useRooms, useFavorites, useRoutes
-├── lib/                        # API client, data cache, room filter logic
+├── hooks/                      # useBuildings, useRooms, useFavorites, useCampusGraph,
+│                               #   useCongestion, useUserLocation
+├── lib/                        # API client, data cache, room filters, routing utilities
 ├── docs/
 │   ├── deliverables/           # Agile/Scrum deliverables
 │   └── contexts/               # AI context references
@@ -129,8 +135,10 @@ broncopath/
 └── backend/                    # Express API + Drizzle schema
     ├── src/
     │   ├── buildings.ts        # Buildings + rooms endpoints
+    │   ├── campusGraph.ts      # Campus graph version + full graph endpoints
+    │   ├── schedules.ts        # Schedule data endpoints
     │   ├── serviceFunctions.ts # Room status derived from schedule data
-    │   ├── db/                 # Drizzle schema + seed
+    │   ├── db/                 # Drizzle schema + Neon connection
     │   └── index.ts            # Express entry point
     └── scraper/                # Python CPP schedule scraper
 ```
